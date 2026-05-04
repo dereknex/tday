@@ -291,6 +291,26 @@ function registerIpc(): void {
       if (sentViaCliArg && initialPrompt) args = [...args, initialPrompt];
 
       env = piLike.env;
+
+      // claude-code only reads ANTHROPIC_* env vars for API routing. If no explicit
+      // override is applied here, it silently inherits ANTHROPIC_BASE_URL from the
+      // shell (e.g. a DeepSeek endpoint) even when the chosen provider is something
+      // completely different (LM Studio, Ollama, …). Always override / clean these.
+      if (req.agentId === 'claude-code' && effectiveProvider) {
+        const cp = effectiveProvider;
+        // Re-inject regardless of apiStyle so we always win over process.env
+        const resolvedUrl = gatewayResolution?.baseUrl ?? cp.baseUrl;
+        if (resolvedUrl) {
+          env.ANTHROPIC_BASE_URL = resolvedUrl;
+          env.ANTHROPIC_API_URL  = resolvedUrl;
+        } else {
+          // Native Anthropic – remove any URL that might point elsewhere
+          delete env.ANTHROPIC_BASE_URL;
+          delete env.ANTHROPIC_API_URL;
+        }
+        if (cp.apiKey) env.ANTHROPIC_API_KEY = cp.apiKey;
+      }
+
       if (req.agentId === 'deepseek-tui' && effectiveProvider) {
         Object.assign(env, deepseekTuiProviderEnv(effectiveProvider.kind, effectiveProvider.apiKey, effectiveProvider.baseUrl));
       }

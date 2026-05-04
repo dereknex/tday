@@ -312,8 +312,17 @@ export function modelFlagsFor(
 ): string[] {
   if (!model) return [];
   switch (agentId) {
-    case 'claude-code':
-      return ['--model', model];
+    case 'claude-code': {
+      // Local servers (LM Studio, Ollama, …) prefix model IDs with the provider
+      // name, e.g. "qwen/qwen3.6-35b-a3b". The Anthropic-compatible API rejects
+      // that prefix — strip it when the provider is a local OpenAI-compat service.
+      const LOCAL_OAI_COMPAT = new Set(['ollama', 'lmstudio', 'litellm', 'vllm', 'sglang']);
+      const modelId =
+        providerKind && LOCAL_OAI_COMPAT.has(providerKind) && model.includes('/')
+          ? model.replace(/^[^/]+\//, '')
+          : model;
+      return ['--model', modelId];
+    }
     case 'opencode': {
       const composed = model.includes('/') ? model : `${opencodeProviderId(providerKind)}/${model}`;
       return ['--model', composed];
