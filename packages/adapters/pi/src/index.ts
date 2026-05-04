@@ -1,4 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, dirname } from 'node:path';
 import type { ProviderProfile } from '@tday/shared';
 
 export interface PiLaunchContext {
@@ -135,11 +138,55 @@ export const PiAdapter = {
         }
       }
 
-      // Tell pi which provider/model to start with — non-fatal if pi ignores
-      // these (older versions used env-only).
-      if (p.kind && p.kind !== 'custom') {
+      // Tell pi which provider/model to start with.
+      //
+      // Native pi providers (openai, anthropic, …) can be passed directly via
+      // --provider. Local OpenAI-compat servers (lmstudio, ollama, …) are NOT
+      // known to pi by default, but pi supports custom providers via
+      // ~/.pi/agent/models.json. We write that file here so pi can find the
+      // provider and all its models, then pass --provider normally.
+      const PI_NATIVE_PROVIDERS = new Set([
+        'openai', 'anthropic', 'google', 'deepseek', 'xai', 'groq',
+        'mistral', 'moonshot', 'cerebras', 'together', 'fireworks',
+        'zai', 'qwen', 'volcengine', 'minimax', 'stepfun', 'openrouter',
+        'perplexity', 'bedrock', 'huggingface', 'nvidia',
+      ]);
+      const LOCAL_OPENAI_COMPAT_PROVIDERS = new Set([
+        'ollama', 'lmstudio', 'litellm', 'vllm', 'sglang',
+      ]);
+
+      if (p.kind && LOCAL_OPENAI_COMPAT_PROVIDERS.has(p.kind) && p.baseUrl) {
+        // Register the provider in ~/.pi/agent/models.json so pi knows about it.
+        const piModelsPath = join(homedir(), '.pi', 'agent', 'models.json');
+        let config: { providers?: Record<string, unknown> } = { providers: {} };
+        try { config = JSON.parse(readFileSync(piModelsPath, 'utf8')); } catch { /* file may not exist */ }
+        if (!config.providers) config.providers = {};
+
+        // Collect all known model IDs (current selection + discovered + extras).
+        const modelSet = new Set<string>();
+        if (p.model) modelSet.add(p.model);
+        for (const m of p.discoveredModels ?? []) modelSet.add(m);
+        for (const m of p.extraModels ?? []) modelSet.add(m);
+
+        config.providers[p.kind] = {
+          baseUrl: p.baseUrl,
+          api: 'openai-completions',
+          apiKey: p.apiKey || 'no-key-required',
+          // Many local servers don't support the OpenAI developer role or
+          // reasoning_effort — disable both to maximise compatibility.
+          compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+          models: [...modelSet].map(id => ({ id })),
+        };
+
+        mkdirSync(dirname(piModelsPath), { recursive: true });
+        writeFileSync(piModelsPath, JSON.stringify(config, null, 2), 'utf8');
+
+        // Now pi knows the provider — pass it so pi selects the right backend.
+        args.push('--provider', p.kind);
+      } else if (p.kind && PI_NATIVE_PROVIDERS.has(p.kind)) {
         args.push('--provider', p.kind);
       }
+
       if (p.model) {
         args.push('--model', p.model);
       }

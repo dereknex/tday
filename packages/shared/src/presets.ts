@@ -274,6 +274,15 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   },
 ];
 
+/** Provider kinds that run locally — Scan button should only appear for these. */
+export const LOCAL_PROVIDER_KINDS = new Set<ProviderKind>([
+  'ollama',
+  'lmstudio',
+  'litellm',
+  'sglang',
+  'vllm',
+]);
+
 export function presetForKind(kind: ProviderKind): ProviderPreset {
   return (
     PROVIDER_PRESETS.find((p) => p.kind === kind) ??

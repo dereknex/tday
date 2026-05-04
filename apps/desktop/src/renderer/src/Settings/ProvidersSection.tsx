@@ -5,7 +5,7 @@ import type {
   ProviderProfile,
   ProviderKind,
 } from '@tday/shared';
-import { PROVIDER_PRESETS, presetForKind } from '@tday/shared';
+import { PROVIDER_PRESETS, presetForKind, LOCAL_PROVIDER_KINDS } from '@tday/shared';
 import { ProviderLogo } from '../ProviderLogo';
 import { Field, StyleToggle } from './shared';
 
@@ -276,14 +276,16 @@ export function ProvidersSection({ cfg, onCfgChange, onSaved }: ProvidersSection
                   }}
                   onBlur={() => saveProviders()}
                 />
-                <button
-                  onClick={() => void runDiscovery()}
-                  disabled={probeState[profile.id]?.probing}
-                  title="Scan this URL for available models"
-                  className="shrink-0 rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-                >
-                  {probeState[profile.id]?.probing ? '…' : 'Scan'}
-                </button>
+                {LOCAL_PROVIDER_KINDS.has(profile.kind) && (
+                  <button
+                    onClick={() => void runDiscovery()}
+                    disabled={probeState[profile.id]?.probing}
+                    title="Scan this URL for available models"
+                    className="shrink-0 rounded-md border border-zinc-700 px-2.5 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                  >
+                    {probeState[profile.id]?.probing ? '…' : 'Scan'}
+                  </button>
+                )}
               </div>
               {probeState[profile.id] && !probeState[profile.id].probing ? (
                 <div className="mt-1 flex items-center gap-1.5 text-[10px]">

@@ -177,14 +177,14 @@ export async function probeService(
 /**
  * Probe an arbitrary base URL (e.g. `http://localhost:1234/v1`) for models.
  *
- * Tries three endpoints in order:
- *   1. `{baseUrl}/models`        (OpenAI-compat: LM Studio, vLLM, llama.cpp, Jan, etc.)
- *   2. `{baseUrl}/v1/models`     (if baseUrl does NOT already end with /v1)
- *   3. Ollama `/api/tags`        (if port matches 11434 OR /api/tags path returns 200)
+ * Strategy:
+ *   1. TCP probe the host:port first — if the port is closed it's truly unreachable.
+ *   2. If TCP succeeds the service IS running; attempt HTTP model enumeration.
+ *   3. Any HTTP response (even 4xx) confirms reachability.
  */
 export async function probeBaseUrl(
   rawUrl: string,
-  timeoutMs = 3_000,
+  timeoutMs = 5_000,
 ): Promise<{ ok: boolean; models: string[]; latencyMs: number; error?: string }> {
   let u: URL;
   try {
@@ -193,9 +193,19 @@ export async function probeBaseUrl(
     return { ok: false, models: [], latencyMs: 0, error: 'Invalid URL' };
   }
 
-  const base = rawUrl.trim().replace(/\/$/, '');
+  const host = u.hostname;
+  const port = Number(u.port) || (u.protocol === 'https:' ? 443 : 80);
 
-  // Candidates to try
+  // ── Step 1: TCP reachability (works for localhost AND LAN IPs) ──────────────
+  const t0 = Date.now();
+  const tcpOpen = await tcpProbe(host, port, Math.min(timeoutMs, 2_000));
+  if (!tcpOpen) {
+    return { ok: false, models: [], latencyMs: 0, error: 'Not reachable' };
+  }
+  const tcpLatency = Date.now() - t0;
+
+  // ── Step 2: HTTP model enumeration (best-effort) ───────────────────────────
+  const base = rawUrl.trim().replace(/\/$/, '');
   const candidates: string[] = [];
   candidates.push(base + '/models');
   if (!/\/v\d+$/.test(base)) candidates.push(base + '/v1/models');
@@ -207,19 +217,14 @@ export async function probeBaseUrl(
     const result = await httpGet(url, timeoutMs);
     if (result.ok) {
       const models = parseModelList(result.body);
-      if (models.length > 0) {
-        return { ok: true, models, latencyMs: result.latencyMs };
-      }
-      // ok response but no models parsed — still mark as reachable
+      return { ok: true, models, latencyMs: result.latencyMs };
+    }
+    if (result.status > 0) {
+      // Got an HTTP response (4xx / 5xx) — service is running
       return { ok: true, models: [], latencyMs: result.latencyMs };
     }
   }
 
-  // Nothing responded — try a plain GET on the base URL itself to check connectivity
-  const ping = await httpGet(u.origin, timeoutMs);
-  if (ping.ok) {
-    return { ok: true, models: [], latencyMs: ping.latencyMs, error: 'No model list endpoint found' };
-  }
-
-  return { ok: false, models: [], latencyMs: 0, error: 'Not reachable' };
+  // TCP was open but all HTTP attempts failed — still reachable
+  return { ok: true, models: [], latencyMs: tcpLatency };
 }

@@ -79,9 +79,9 @@ export const AGENT_TITLE_MAP: Record<AgentId, string> = {
 };
 
 export const AGENT_COLOR_MAP: Record<AgentId, string> = {
-  pi: '#a78bfa',
+  pi: '#e879f9',
   'claude-code': '#f97316',
-  codex: '#788bff',
+  codex: '#af9eff',
   copilot: '#60a5fa',
   opencode: '#34d399',
   gemini: '#4ade80',
