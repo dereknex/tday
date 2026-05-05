@@ -240,6 +240,12 @@ export function triggerHistoryRefresh(): void {
  * Used by the IPC handler so the renderer always gets populated data.
  */
 export async function refreshAndListAgentHistory(filter?: AgentHistoryFilter): Promise<AgentHistoryEntry[]> {
+  // Do NOT reuse an in-flight refreshPromise here: that promise may have
+  // captured tdayEntries *before* a concurrent mergeTabEntry() wrote a new
+  // entry to the store.  Waiting for it would cause its final saveStore() to
+  // overwrite the newly-merged entry.  Instead, wait for any running scan to
+  // finish first, then start a fresh scan so we always read the latest store.
+  if (refreshPromise) await refreshPromise;
   await runRefresh();
   return listAgentHistory(filter);
 }

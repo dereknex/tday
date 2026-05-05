@@ -120,6 +120,31 @@ export function useTabs(home: string, defaultAgentId: AgentId): TabsHook {
       return next;
     });
 
+    // ── Optimistic update: add to agentHistory IMMEDIATELY (no IPC wait) ───────
+    // This makes the dropdown and Settings > History update the instant a tab
+    // is closed, before any async IPC round-trip completes.
+    const closedAt = Date.now();
+    if (closing) {
+      const optimisticEntry: AgentHistoryEntry = {
+        id: `tday:${id}-${closedAt}`,
+        agentId: closing.agentId,
+        sessionId: closing.agentSessionId,
+        title: closing.title,
+        cwd: closing.cwd,
+        startedAt: closedAt,
+        updatedAt: closedAt,
+        messageCount: 0,
+        source: 'tday',
+      };
+      setAgentHistory((prev) => {
+        // Skip if a native entry for this session is already tracked.
+        if (closing.agentSessionId && prev.some((e) => e.sessionId === closing.agentSessionId)) {
+          return prev;
+        }
+        return [optimisticEntry, ...prev];
+      });
+    }
+
     const saveHistory = async () => {
       let sessionId = closing?.agentSessionId ?? null;
       if (closing && !sessionId && RESUME_CAPABLE.includes(closing.agentId) && closing.cwd) {
@@ -128,17 +153,17 @@ export function useTabs(home: string, defaultAgentId: AgentId): TabsHook {
       void window.tday.kill(id);
       if (closing) {
         const entry: TabHistoryEntry = {
-          histId: `${id}-${Date.now()}`,
+          histId: `${id}-${closedAt}`,
           title: closing.title,
           agentId: closing.agentId,
           cwd: closing.cwd,
-          closedAt: Date.now(),
+          closedAt,
           agentSessionId: sessionId ?? undefined,
         };
         await window.tday.pushTabHistory(entry);
         const updated = await window.tday.listTabHistory();
         setTabHistory(updated);
-        // Refresh agentHistory in background so History section stays current.
+        // Background sync: get accurate state from main (native sessions, dedup, etc.)
         void window.tday.listAgentHistory().then((h) => setAgentHistory(h));
       }
     };
