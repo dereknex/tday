@@ -78,17 +78,20 @@ export default function App() {
   // ── Startup: load home, agents, settings in parallel ───────────────────────
   useEffect(() => {
     void (async () => {
-      // Critical path: only what is needed to restore tabs and pick the default agent.
-      // listProviders and listCoworkers are deferred so they don't block first paint.
-      const [h, list, settings] = await Promise.all([
+      // Critical path: only home dir + persisted settings are needed before first paint.
+      // listAgents / listProviders / listCoworkers are all deferred — they don't block rendering.
+      const [h, settings] = await Promise.all([
         window.tday.homeDir(),
-        window.tday.listAgents() as Promise<AgentInfo[]>,
         window.tday.getAllSettings(),
       ]);
       setHome(h);
-      setAgentList(list);
 
-      // Deferred: providers and coworkers are not needed for initial render.
+      // Deferred: agents, providers and coworkers are not needed for initial render.
+      void (window.tday.listAgents() as Promise<AgentInfo[]>).then((list) => {
+        setAgentList(list);
+        const def = (list.find((a) => a.isDefault)?.id as AgentId | undefined) ?? 'pi';
+        maybeAutoInstall(h, list, setAgentList, def);
+      });
       void window.tday.listProviders().then((provCfg: { profiles: ProviderProfile[] }) => setProvidersList(provCfg.profiles ?? []));
       void window.tday.listCoworkers().then(setCoworkers);
 
@@ -96,11 +99,12 @@ export default function App() {
         typeof settings[LAST_CWD_KEY] === 'string' ? (settings[LAST_CWD_KEY] as string) : h;
       setLastCwd(initialCwd);
 
-      const def = (list.find((a) => a.isDefault)?.id as AgentId | undefined) ?? 'pi';
       const persisted = loadPersistedTabsFromRaw(settings[TABS_STATE_KEY]);
       const savedActiveId =
         typeof settings[ACTIVE_TAB_KEY] === 'string' ? (settings[ACTIVE_TAB_KEY] as string) : null;
-      initTabs(persisted, savedActiveId, initialCwd, def);
+      // defaultAgentId fallback 'pi' is fine here — only used for brand-new installs
+      // (no persisted tabs). Existing sessions always restore their own agentId.
+      initTabs(persisted, savedActiveId, initialCwd, 'pi');
 
       const logoHinted = !!settings[LOGO_HINTED_KEY];
       const keepAwake = settings[KEEP_AWAKE_KEY] === true;
@@ -116,8 +120,6 @@ export default function App() {
         },
         () => initKeepAwake(true),
       );
-
-      maybeAutoInstall(h, list, setAgentList, def);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

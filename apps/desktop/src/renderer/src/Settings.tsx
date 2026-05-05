@@ -109,7 +109,10 @@ export function Settings({
     if (initialSection) setSection(initialSection);
     // Refresh agentHistory so History tab always shows latest sessions.
     onRefreshHistory?.();
-    // agents / coworkers / cfg are owned by App and passed via props — no IPC here.
+    // Refresh agents, providers and coworkers so Settings always shows current state.
+    void (window.tday.listAgents() as Promise<AgentInfo[]>).then((list) => onAgentsChange?.(list));
+    void window.tday.listProviders().then((c) => onCfgChange?.(c as ProvidersConfig));
+    void window.tday.listCoworkers().then((cws) => onCoworkersChange?.(cws));
     // getAllSettings is fast (in-memory) — always refresh for shared flag.
     void window.tday.getAllSettings().then((s) => {
       setShared(s['tday:sharedAgentConfig'] === true);
