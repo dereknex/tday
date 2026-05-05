@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import { electronApp } from '@electron-toolkit/utils';
 import { spawn as spawnPty } from 'node-pty';
 import { spawn as spawnChild } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -69,6 +69,22 @@ import { setupPowerMonitor, registerPowerHandlers, stopCaffeinate } from './powe
 import { createWindow, watchWindowShortcuts, installAppMenu, mainWindow } from './window.js';
 
 const localGatewayManager = createLocalGatewayManager();
+
+// ── claude-code concurrent-session state ──────────────────────────────────────
+// claude-code reads ~/.claude/settings.json AFTER process.env, overriding any
+// env vars we inject. To allow multiple tabs to run claude-code simultaneously
+// with different providers, we use this strategy:
+//
+//   1. Each session writes a per-session temp settings file under ~/.claude/
+//      and passes "--settings <tempFile>" so its provider env takes effect.
+//   2. The global ~/.claude/settings.json env section must not interfere, so
+//      we clear it when the first session starts (ref count 0→1) and restore
+//      the original when the last session exits (ref count 1→0).
+//
+// This means N concurrent claude-code tabs each get their own independent
+// provider config without fighting over the single global settings.json.
+const claudeSessionCount = { n: 0 };
+let claudeGlobalSettingsBackup: string | null = undefined as unknown as string | null; // undefined = never read
 
 // ── CronJob scheduler ─────────────────────────────────────────────────────────
 
@@ -294,30 +310,42 @@ function registerIpc(): void {
       env = piLike.env;
 
       // ── claude-code provider override ─────────────────────────────────────
-      // claude-code re-injects env vars from ~/.claude/settings.json AFTER the
-      // process env is set, so any ANTHROPIC_BASE_URL in settings.json (e.g.
-      // pointing to a user's global DeepSeek config) silently overrides what
-      // tday sets via process.env or --settings.
+      // claude-code reads ~/.claude/settings.json env section AFTER process.env,
+      // silently overriding whatever we inject. We handle this with two layers:
       //
-      // Strategy (following cc-switch): directly patch ~/.claude/settings.json
-      // before spawning. We save the original content first and restore it when
-      // the PTY exits, so the user's settings are always preserved.
+      //   Layer 1 — per-session temp settings file:
+      //     Write our provider env to a per-session temp file
+      //     (~/.claude/tday-session-<tabId>.json) and pass --settings <file>.
+      //     This file is deleted when the PTY exits.
+      //
+      //   Layer 2 — global env section cleared (ref-counted):
+      //     The global settings.json env section must not interfere with the
+      //     per-session temp file. On the first concurrent claude-code session
+      //     (ref count 0→1) we blank the env keys in the global file and save
+      //     the original. On the last session exit (ref count 1→0) we restore
+      //     the original. Multiple concurrent tabs are each isolated via their
+      //     own temp file while the global env stays silent.
       if (req.agentId === 'claude-code' && effectiveProvider) {
         const cp = effectiveProvider;
-        // LM Studio and Ollama expose a native Anthropic-compatible endpoint at
-        // their root URL (e.g. http://localhost:1234), NOT at the /v1 sub-path
-        // that is used for their OpenAI-compat endpoint. The Anthropic SDK
-        // appends /v1/messages automatically, so we must strip the trailing
-        // /v1 that tday stores as the OpenAI base URL.
+        // Resolve the correct Anthropic-compatible base URL per provider kind.
+        // - LM Studio/Ollama: strip /v1 (native Anthropic endpoint at root)
+        // - DeepSeek: strip /v1 then append /anthropic
+        // - Others: use as-is (cloud providers already point to the right base)
         const LOCAL_OAI_COMPAT = new Set(['ollama', 'lmstudio', 'litellm', 'vllm', 'sglang']);
         const rawUrl = cp.baseUrl ?? '';
-        const resolvedUrl = LOCAL_OAI_COMPAT.has(cp.kind ?? '')
-          ? rawUrl.replace(/\/v1\/?$/, '')   // http://localhost:1234/v1 → http://localhost:1234
-          : rawUrl;
+        let resolvedUrl: string;
+        if (LOCAL_OAI_COMPAT.has(cp.kind ?? '')) {
+          resolvedUrl = rawUrl.replace(/\/v1\/?$/, '');
+        } else if (cp.kind === 'deepseek') {
+          const base = rawUrl.replace(/\/$/, '').replace(/\/v1\/?$/, '');
+          resolvedUrl = base.endsWith('/anthropic') ? base : `${base}/anthropic`;
+        } else {
+          resolvedUrl = rawUrl;
+        }
         const apiKey = cp.apiKey ?? 'no-key-required';
 
-        // Build the env section to inject. Model override keys are blanked so
-        // claude-code won't route to a stale model name from user's settings.
+        // Env overrides for this session. Model keys are cleared so a stale
+        // model name in the user's global settings won't take effect.
         const envPatch: Record<string, string> = {
           ANTHROPIC_MODEL: '',
           ANTHROPIC_DEFAULT_OPUS_MODEL: '',
@@ -335,82 +363,64 @@ function registerIpc(): void {
           envPatch.ANTHROPIC_AUTH_TOKEN = apiKey;
         }
 
-        // Patch ~/.claude/settings.json and schedule a restore on PTY exit.
         const claudeDir = join(homedir(), '.claude');
-        const claudeSettingsPath = join(claudeDir, 'settings.json');
-        let originalSettings: string | null = null;
+        const globalSettingsPath = join(claudeDir, 'settings.json');
+        // Per-session temp settings file — unique per tab, never collides.
+        const sessionSettingsPath = join(claudeDir, `tday-session-${req.tabId}.json`);
+
         try {
           mkdirSync(claudeDir, { recursive: true });
-          // Save original so we can restore it after claude-code exits.
-          try { originalSettings = readFileSync(claudeSettingsPath, 'utf8'); } catch { /* file may not exist */ }
-          const existing: Record<string, unknown> =
-            originalSettings ? (JSON.parse(originalSettings) as Record<string, unknown>) : {};
-          const patched = {
-            ...existing,
-            env: { ...(existing.env as Record<string, string> | undefined ?? {}), ...envPatch },
-          };
-          writeFileSync(claudeSettingsPath, JSON.stringify(patched, null, 2), 'utf8');
+
+          // ── Layer 1: write per-session temp file ──────────────────────────
+          const sessionSettings = { env: envPatch };
+          writeFileSync(sessionSettingsPath, JSON.stringify(sessionSettings, null, 2), 'utf8');
+          // Instruct claude-code to load this file (merged with global).
+          args = ['--settings', sessionSettingsPath, ...args];
+
+          // ── Layer 2: blank global env (ref-counted) ───────────────────────
+          if (claudeSessionCount.n === 0) {
+            // First session: capture the true original and clear global env.
+            try { claudeGlobalSettingsBackup = readFileSync(globalSettingsPath, 'utf8'); }
+            catch { claudeGlobalSettingsBackup = null; }
+
+            const existing: Record<string, unknown> =
+              claudeGlobalSettingsBackup
+                ? (JSON.parse(claudeGlobalSettingsBackup) as Record<string, unknown>)
+                : {};
+            const neutralized = { ...existing, env: {} };
+            writeFileSync(globalSettingsPath, JSON.stringify(neutralized, null, 2), 'utf8');
+          }
+          claudeSessionCount.n += 1;
         } catch (e) {
-          console.warn('[tday] could not patch ~/.claude/settings.json:', e);
+          console.warn('[tday] could not set up claude-code session settings:', e);
         }
-        // Store restore callback — used in pty.onExit below.
+
+        // Restore callback: clean up temp file and (last session) restore global.
         claudeSettingsRestore = () => {
           try {
-            if (originalSettings === null) return; // file didn't exist — nothing to restore
-            writeFileSync(claudeSettingsPath, originalSettings, 'utf8');
+            try { unlinkSync(sessionSettingsPath); } catch { /* ok */ }
+            claudeSessionCount.n = Math.max(0, claudeSessionCount.n - 1);
+            if (claudeSessionCount.n === 0) {
+              // Last session done — restore global settings.json.
+              if (claudeGlobalSettingsBackup === null) {
+                // File didn't exist before; remove what we created.
+                try { unlinkSync(globalSettingsPath); } catch { /* ok */ }
+              } else if (claudeGlobalSettingsBackup !== undefined) {
+                writeFileSync(globalSettingsPath, claudeGlobalSettingsBackup, 'utf8');
+              }
+              claudeGlobalSettingsBackup = undefined as unknown as string | null;
+            }
           } catch (e) {
-            console.warn('[tday] could not restore ~/.claude/settings.json:', e);
+            console.warn('[tday] could not restore claude-code settings:', e);
           }
         };
 
-        // 2. Also set the env vars in our process env for the child process
+        // Also inject into process env for completeness.
         Object.assign(env, envPatch);
       }
 
       if (req.agentId === 'deepseek-tui' && effectiveProvider) {
         Object.assign(env, deepseekTuiProviderEnv(effectiveProvider.kind, effectiveProvider.apiKey, effectiveProvider.baseUrl));
-      }
-
-      // ── opencode provider override ─────────────────────────────────────────
-      // opencode (local providers) needs the provider registered in its config.
-      // Rather than mutating ~/.config/opencode/opencode.json, we use the
-      // OPENCODE_CONFIG_CONTENT env var which opencode merges as a mid-priority
-      // override (after global config, before project config). This tells
-      // opencode about the custom provider + its baseURL + available models.
-      if (req.agentId === 'opencode' && effectiveProvider) {
-        const cp = effectiveProvider;
-        const OC_LOCAL = new Set(['ollama', 'lmstudio', 'litellm', 'vllm', 'sglang']);
-        if (cp.kind && OC_LOCAL.has(cp.kind) && cp.baseUrl) {
-          // Collect all known model IDs, stripping any server-side prefix.
-          const modelSet = new Set<string>();
-          const strip = (m: string) => m.includes('/') ? m.replace(/^[^/]+\//, '') : m;
-          if (cp.model) modelSet.add(strip(cp.model));
-          for (const m of cp.discoveredModels ?? []) modelSet.add(strip(m));
-          for (const m of cp.extraModels ?? []) modelSet.add(strip(m));
-          if (modelSet.size === 0) modelSet.add('default');
-
-          const modelsMap: Record<string, { name: string }> = {};
-          for (const m of modelSet) modelsMap[m] = { name: m };
-
-          const DISPLAY: Record<string, string> = {
-            lmstudio: 'LM Studio (local)',
-            ollama: 'Ollama (local)',
-            litellm: 'LiteLLM (proxy)',
-            vllm: 'vLLM (local)',
-            sglang: 'SGLang (local)',
-          };
-          const providerDef: Record<string, unknown> = {
-            npm: '@ai-sdk/openai-compatible',
-            name: DISPLAY[cp.kind] ?? cp.kind,
-            options: {
-              baseURL: cp.baseUrl,
-              ...(cp.apiKey ? { apiKey: cp.apiKey } : { apiKey: 'no-key-required' }),
-            },
-            models: modelsMap,
-          };
-          const configContent = { provider: { [cp.kind]: providerDef } };
-          env.OPENCODE_CONFIG_CONTENT = JSON.stringify(configContent);
-        }
       }
 
       if (gatewayResolution?.noProxyHosts?.length) appendNoProxy(env, gatewayResolution.noProxyHosts);

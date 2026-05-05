@@ -1,4 +1,4 @@
-# Tday — The Ultimate Harness Agent Terminal Launcher
+# Tday — All-in-One Harness Agent Terminal
 
 > One terminal launcher for every coding-agent harness — Claude Code, Codex, Copilot CLI, OpenCode, Pi, and more. Browser-style tabs, unified provider config, auto-detected local inference, long-term memory, and cross-agent token analytics.
 

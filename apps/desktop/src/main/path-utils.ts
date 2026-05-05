@@ -156,6 +156,40 @@ export function augmentPath(): void {
 
   const current = process.env.PATH ?? '';
   const seen = new Set(current.split(PATH_SEP).filter(Boolean));
+
+  // Windows: read the user's and system's PATH directly from the registry.
+  //
+  // When Electron is launched from a desktop shortcut, it inherits Explorer's
+  // environment which may be missing user-level PATH modifications (e.g. paths
+  // added by Node.js, nvm-windows, Scoop, Volta, custom installers, etc.).
+  // The definitive source for what the user sees in cmd.exe is the registry:
+  //   - HKLM\SYSTEM\...\Environment → system PATH
+  //   - HKCU\Environment            → user PATH (merged on top by Explorer)
+  // We read both and merge them in, expanding %VAR% references against the
+  // current process.env so paths like %APPDATA%\npm resolve correctly.
+  if (process.platform === 'win32') {
+    const regKeys = [
+      'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment',
+      'HKCU\\Environment',
+    ];
+    for (const key of regKeys) {
+      try {
+        const out = execFileSync('reg', ['query', key, '/v', 'Path'], {
+          encoding: 'utf8',
+          timeout: 3_000,
+        });
+        // Output line: "    Path    REG_EXPAND_SZ    <value>"
+        const match = out.match(/\s+Path\s+REG_(?:SZ|EXPAND_SZ)\s+(.+)/i);
+        if (match?.[1]) {
+          const expanded = match[1].trim().replace(/%([^%]+)%/g, (_, n: string) =>
+            process.env[n] ?? process.env[n.toUpperCase()] ?? `%${n}%`,
+          );
+          for (const p of expanded.split(';').filter(Boolean)) seen.add(p);
+        }
+      } catch { /* ignore — reg may not exist or may be restricted */ }
+    }
+  }
+
   for (const e of extras) if (existsSync(e)) seen.add(e);
   process.env.PATH = Array.from(seen).join(PATH_SEP);
 }
