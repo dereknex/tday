@@ -168,13 +168,20 @@ export function augmentPath(): void {
   // We read both and merge them in, expanding %VAR% references against the
   // current process.env so paths like %APPDATA%\npm resolve correctly.
   if (process.platform === 'win32') {
+    // CRITICAL: When Electron is launched from a desktop shortcut, PATH may be
+    // just ".tday\bin".  System tools like reg.exe and where.exe live in
+    // %SystemRoot%\System32 which may NOT be on this minimal PATH.  Always use
+    // the absolute path so execFileSync can find them regardless.
+    const sysRoot = process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows';
+    const REG_EXE = join(sysRoot, 'System32', 'reg.exe');
+
     const regKeys = [
       'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment',
       'HKCU\\Environment',
     ];
     for (const key of regKeys) {
       try {
-        const out = execFileSync('reg', ['query', key, '/v', 'Path'], {
+        const out = execFileSync(REG_EXE, ['query', key, '/v', 'Path'], {
           encoding: 'utf8',
           timeout: 3_000,
         });
@@ -186,7 +193,7 @@ export function augmentPath(): void {
           );
           for (const p of expanded.split(';').filter(Boolean)) seen.add(p);
         }
-      } catch { /* ignore — reg may not exist or may be restricted */ }
+      } catch { /* ignore — reg may be restricted on this machine */ }
     }
   }
 

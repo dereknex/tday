@@ -434,17 +434,34 @@ function registerIpc(): void {
     env.LINES = String(req.rows);
 
     const resolved = resolveExecutable(cmd, env);
-    if (!resolved.resolved) {
-      const pathParts = (env.PATH ?? '').split(PATH_SEP).filter(Boolean);
-      const pathPreview = pathParts.slice(0, 8).join(PATH_SEP);
-      throw new Error(
-        `executable not found: ${resolved.requested}\ncwd: ${launchCwd}\nPATH: ${pathPreview}${pathParts.length > 8 ? `${PATH_SEP}…` : ''}`,
-      );
-    }
 
-    // On Windows, node-pty (ConPTY / CreateProcess) cannot execute .cmd
-    // or .bat files directly — wrap them in cmd.exe /c if needed.
-    const { file: spawnFile, args: spawnArgs } = windowsCmdWrap(resolved.resolved, args);
+    let spawnFile: string;
+    let spawnArgs: string[];
+
+    if (!resolved.resolved) {
+      if (process.platform === 'win32') {
+        // Ultimate fallback on Windows: delegate to cmd.exe /c so that cmd.exe
+        // resolves the binary using its own authoritative PATH (which always
+        // matches what the user sees in a cmd.exe window, regardless of what
+        // Electron inherited from the shortcut launcher).
+        // This mirrors the VS Code / Tabby approach: never try to replicate
+        // cmd.exe's lookup logic — just let cmd.exe do it.
+        const comSpec = process.env.ComSpec ??
+          join(process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows', 'System32', 'cmd.exe');
+        spawnFile = comSpec;
+        spawnArgs = ['/c', cmd, ...args];
+      } else {
+        const pathParts = (env.PATH ?? '').split(PATH_SEP).filter(Boolean);
+        const pathPreview = pathParts.slice(0, 8).join(PATH_SEP);
+        throw new Error(
+          `executable not found: ${resolved.requested}\ncwd: ${launchCwd}\nPATH: ${pathPreview}${pathParts.length > 8 ? `${PATH_SEP}…` : ''}`,
+        );
+      }
+    } else {
+      // On Windows, node-pty (ConPTY / CreateProcess) cannot execute .cmd
+      // or .bat files directly — wrap them in cmd.exe /c if needed.
+      ({ file: spawnFile, args: spawnArgs } = windowsCmdWrap(resolved.resolved, args));
+    }
 
     const pty = spawnPty(spawnFile, spawnArgs, {
       name: 'xterm-256color',

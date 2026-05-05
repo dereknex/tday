@@ -141,7 +141,12 @@ const detectCache = new Map<string, { available: boolean; version?: string; erro
 
 function _detectGenericUncached(bin: string): { available: boolean; version?: string; error?: string } {
   try {
-    const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+    // Use absolute paths for system tools: when Electron starts from a shortcut
+    // on Windows, PATH may only contain .tday\bin — 'where' and 'which' won't
+    // be found unless we reference them absolutely.
+    const whichCmd = process.platform === 'win32'
+      ? join(process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows', 'System32', 'where.exe')
+      : 'which';
     const raw = execFileSync(whichCmd, [bin], { encoding: 'utf8' }).split(/\r?\n/)[0].trim();
     if (!raw) return { available: false };
     let version: string | undefined;
@@ -198,10 +203,13 @@ export function resolveExecutable(
     }
   }
 
-  // Last-resort: try which/where (may find files outside PATH dirs, e.g.
-  // registered App Paths on Windows).
+  // Last-resort: try where.exe / which (may find files outside PATH dirs, e.g.
+  // App Paths on Windows).  Use absolute path for where.exe so it works even
+  // when PATH is minimal (Electron launched from a desktop shortcut).
   try {
-    const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+    const whichCmd = process.platform === 'win32'
+      ? join(process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows', 'System32', 'where.exe')
+      : 'which';
     const resolved = execFileSync(whichCmd, [bin], {
       encoding: 'utf8',
       env,
