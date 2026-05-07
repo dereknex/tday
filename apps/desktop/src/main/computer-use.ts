@@ -1,7 +1,7 @@
 /**
  * Computer Use — MCP server injection for agent harnesses.
  *
- * Injects `tday-devtools` as an MCP server into each agent's config
+ * Injects `tday-nativecore` as an MCP server into each agent's config
  * before spawn and cleans up after the PTY exits.
  *
  * Supported agents:
@@ -45,23 +45,32 @@ These tools let you control the macOS desktop, browsers, and Android devices.
 
 \`\`\`
 User request involves the desktop / a running app?
-  ├─ Is it a Chrome/Electron app (browser, VS Code, Slack, Discord, Figma...)?
-  │    └─ Use CDP: probe_app → cdp_connect → cdp_find_elements / cdp_fill / cdp_click
-  ├─ Is it a native macOS app (Finder, Mail, Xcode, System Settings...)?
-  │    └─ Use AX: take_ax_snapshot → ax_click / ax_set_value / ax_select
-  └─ Anything else (games, custom UIs, unknown apps, image matching needed)?
-       └─ Use Visual: take_screenshot → find_text / find_image → click / type_text
+  ├─ 1st choice — AX (most reliable; no Screen Recording needed; survives window moves):
+  │    take_ax_snapshot → ax_click / ax_set_value / ax_select / ax_perform_action
+  │    Works for: all native macOS apps, most Electron apps (non-web-content areas)
+  │
+  ├─ 2nd choice — Visual + Mouse/Keyboard (universal fallback):
+  │    take_screenshot → find_text / ocr_screenshot → click / type_text / shortcut / scroll / drag
+  │    Use when: AX returns empty tree, element has no UID, or the UI is canvas/game/image-based
+  │
+  └─ LAST RESORT — CDP (only Chrome/Electron web content, and only if AX+Visual both fail):
+       probe_app → cdp_connect → cdp_find_elements / cdp_fill / cdp_click
+       Use when: form fields or buttons are inside a web page and can't be found by find_text
 \`\`\`
+
+> **Always try AX first** — it is pixel-perfect, doesn't need Screen Recording permission,
+> and survives window moves/resizes. Drop to Visual when AX has no coverage.
+> CDP is powerful but brittle (port changes, page reloads, CSP) — use it only as a last resort.
 
 ## Core tools reference
 
 ### Screen & Vision
 | Tool | When to use |
 |------|-------------|
-| \`take_screenshot\` | Start of every task; verify after each action. Pass \`window_id\` to capture a specific window |
-| \`find_text\` | Locate text on screen without reading coordinates manually. Returns \`{x,y}\` of each match |
-| \`find_image\` | Match a template sub-image inside a screenshot (icon recognition, button matching) |
-| \`element_at_point\` | Identify what AX element sits at given screen coords |
+| \`take_screenshot\` | **Last resort visual fallback** — only when AX and find_text give no useful result (canvas, game, PDF, fully custom-drawn UI). Avoid calling it as a routine step. |
+| \`find_text\` | **Preferred** for locating on-screen text — uses AX tree first, OCR fallback. Returns \`{x,y}\` without a full screenshot. |
+| \`find_image\` | Match a template sub-image to locate icons/buttons visually |
+| \`element_at_point\` | Identify the AX element at given screen coords |
 
 ### Mouse & Keyboard
 | Tool | Notes |
@@ -121,9 +130,10 @@ Tools mirror the macOS set: \`android_screenshot\`, \`android_click\`, \`android
 1. list_apps                          // check if already running
 2. launch_app {app_name}              // if not running
 3. wait {duration: 1}                 // let the window appear
-4. take_screenshot                    // orient yourself
-5. take_ax_snapshot {app_name} OR probe_app {app_name}  // choose approach
-6. interact → verify with take_screenshot
+4. take_ax_snapshot {app_name}        // preferred: structured, no screen recording needed
+   OR probe_app → cdp_connect         // for Chrome/Electron web content
+5. interact via ax_click / ax_set_value / cdp_fill
+6. verify cheaply: find_text or check AX value — NOT a full screenshot
 \`\`\`
 
 **Fill a web form in Chrome/Electron**
@@ -138,11 +148,10 @@ Tools mirror the macOS set: \`android_screenshot\`, \`android_click\`, \`android
 
 **Click something you can see on screen**
 \`\`\`
-1. take_screenshot                    // capture screen
-2. find_text {text}                   // get {x,y} of the text
-   OR estimate coords from the screenshot image
-3. click {x, y}
-4. take_screenshot                    // verify the click had effect
+1. find_text {text}                   // get {x,y} directly — no screenshot needed
+   OR take_ax_snapshot → ax_click     // even better: uid-based, survives window moves
+2. click {x, y}
+3. verify: find_text or check AX value (avoid a full screenshot if possible)
 \`\`\`
 
 **Type into a text field**
@@ -162,9 +171,9 @@ shortcut {shortcut: "ctrl+a"}             // Select all (Linux/Windows apps)
 \`\`\`
 
 ## Reliability rules
-- **Always take a screenshot first** to understand the current state before acting.
-- **Verify after every action** — another screenshot confirms the action worked.
-- **Prefer AX/CDP over pixel clicks** when available; coordinates break if the window moves.
+- **Start with AX, not screenshots** — \`take_ax_snapshot\` and \`find_text\` work without Screen Recording permission and are faster. Use \`take_screenshot\` only when the UI is non-standard (canvas, game, PDF, custom-drawn).
+- **Verify cheaply after actions** — check with \`find_text\` or an AX value query first. Only escalate to \`take_screenshot\` if the cheap check is insufficient.
+- **Prefer AX/CDP over pixel clicks** — coordinates break if the window moves; uid-based AX clicks do not.
 - **Use \`wait\`** after launching apps, opening dialogs, or triggering animations before the next action.
 - **Use \`find_text\` or \`take_ax_snapshot\`** rather than hardcoding coordinates from memory.
 - **If \`take_screenshot\` returns a black/blank image**: macOS Screen Recording permission is missing. Direct the user to: System Settings → Privacy & Security → Screen Recording → enable the terminal app.
@@ -277,22 +286,22 @@ export interface OpencodeMcpEntry {
   environment?: Record<string, string>;
 }
 
-/** Returns the absolute path to the bundled `tday-devtools` binary. */
+/** Returns the absolute path to the bundled `tday-nativecore` binary. */
 function devToolsBinaryPath(): string {
-  const exe = process.platform === 'win32' ? 'tday-devtools.exe' : 'tday-devtools';
+  const exe = process.platform === 'win32' ? 'tday-nativecore.exe' : 'tday-nativecore';
   if (app.isPackaged) {
     return join(process.resourcesPath, exe);
   }
   // Dev: cargo build output relative to the monorepo root
-  return join(__dirname, '../../../../crates/tday-devtools/target/release', exe);
+  return join(__dirname, '../../../../crates/tday-nativecore/target/release', exe);
 }
 
-/** Returns the MCP server definition for tday-devtools (claude-code / gemini format). */
+/** Returns the MCP server definition for tday-nativecore (claude-code / gemini format). */
 export function buildMcpEntry(): McpEntry {
   return { command: devToolsBinaryPath(), args: [] };
 }
 
-/** Returns the MCP server definition for tday-devtools (opencode format). */
+/** Returns the MCP server definition for tday-nativecore (opencode format). */
 export function buildOpencodeMcpEntry(): OpencodeMcpEntry {
   return { type: 'local', command: [devToolsBinaryPath()], enabled: true };
 }
@@ -537,9 +546,13 @@ export function writeComputerUseSkillFiles(home?: string): void {
   const codexDir = join(h, '.codex');
   appendMarkdownBlock(join(codexDir, 'instructions.md'), codexDir, COMPUTER_USE_SKILL);
 
-  // pi: ~/.pi/agent/skills/<name>.md (auto-discovered by pi)
-  const piSkillDir = join(h, '.pi', 'agent', 'skills');
-  writeSkillFile(join(piSkillDir, `${MCP_SERVER_KEY}.md`), piSkillDir, `${COMPUTER_USE_SKILL}\n`);
+  // pi: ~/.pi/agent/skills/<name>/SKILL.md (auto-discovered by pi; name must match parent dir)
+  const piSkillDir = join(h, '.pi', 'agent', 'skills', MCP_SERVER_KEY);
+  writeSkillFile(
+    join(piSkillDir, 'SKILL.md'),
+    piSkillDir,
+    `---\nname: ${MCP_SERVER_KEY}\ndescription: "Control native desktop apps, browsers and GUI elements via screenshots, click, type, AX dispatch and CDP."\n---\n\n${COMPUTER_USE_SKILL}\n`,
+  );
 }
 
 /**
@@ -563,7 +576,7 @@ export function removeComputerUseSkillFiles(home?: string): void {
   removeMarkdownBlock(join(h, '.codex', 'instructions.md'));
 
   // pi
-  removeSkillFile(join(h, '.pi', 'agent', 'skills', `${MCP_SERVER_KEY}.md`));
+  removeSkillFile(join(h, '.pi', 'agent', 'skills', MCP_SERVER_KEY, 'SKILL.md'));
 }
 
 // ── Pi MCP bridge injection ───────────────────────────────────────────────────

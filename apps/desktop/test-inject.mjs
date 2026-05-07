@@ -15,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const MCP_SERVER_KEY = 'tday-computer-use';
 const SKILL_MARKER   = 'tday:computerUseEnabled';
-const DEV_BINARY     = join(__dirname, '../../crates/tday-devtools/target/release/tday-devtools');
+const DEV_BINARY     = join(__dirname, '../../crates/tday-nativecore/target/release/tday-nativecore');
 
 const activeInjections = new Map();
 

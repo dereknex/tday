@@ -109,21 +109,22 @@ Today, every coding-agent harness ships with its own CLI, its own provider confi
 
 | # | Feature | Description |
 |---|---|---|
-| 1 | **Multi-tab workspace** | Open any agent in browser-style tabs, drag to reorder, multi-row wrap, per-tab working directory with cwd commit and last-cwd persistence. |
-| 2 | **Unified agent history** | Every session across all agents is automatically indexed. Browse, search, and restore any past conversation — including working directory and session ID — with one click. |
-| 3 | **Cross-agent usage analytics** | Complete token and cost tracking for every agent and every session. Daily bar chart, by-model and by-agent breakdown tables, 30+ model pricing — all stored locally in SQLite. |
-| 4 | **10 AI agent adapters** | Pi, Claude Code, Codex CLI, GitHub Copilot CLI, OpenCode, Gemini CLI, Qwen-Code, Crush, Hermes, DeepSeekTUI — each with auto-detect, one-click install, and per-agent accent color. |
-| 5 | **CoWorker system** | Reusable role personas injected as system prompts — selected per tab from the CwdBar. 10 community presets across 4 categories (Thinking Frameworks, Investment & Business, AI & Engineering, Investment Analysis) sourced from [`CoWorkers.md`](./CoWorkers.md), 8 built-in engineer roles, or your own custom/online CoWorkers. Community contributions welcome. |
-| 6 | **Cron job scheduler** | Schedule automated agent tasks with Interval / At Time / Custom cron modes. Human-readable preview, enable/disable, clone, delete, and a live dashboard with next-run countdown and last-status. |
-| 7 | **28-provider settings panel** | CRUD UI for DeepSeek, OpenAI, Anthropic, Gemini, xAI, Groq, Mistral, Ollama, LM Studio, OpenRouter, and 18 more — supports both OpenAI-compatible and Anthropic-compatible base URLs. |
-| 8 | **Per-agent provider & model binding** | Each agent tab runs on a different provider and model. Model flags are projected to CLI arguments at spawn time. Shared-config "all agents one provider" toggle also available. |
-| 9 | **Local inference auto-discovery** | TCP + HTTP fingerprint scan for Ollama, LM Studio, vLLM, llama.cpp, SGLang, LocalAI, Jan. Discovered models appear as chips in the provider UI. Manual base-URL probe available. |
-| 10 | **Agent-native session resume** | Claude Code (`--resume`), Codex (`resume <id>`), OpenCode (`--session`), DeepSeekTUI (`resume <id>`) — session IDs are captured automatically and offered on tab restore. |
-| 11 | **Reliable prompt delivery** | Task prompts reach the agent at spawn time even when the screen is locked: CLI arg for Codex / Claude Code / Gemini / Qwen-Code / DeepSeekTUI; bracketed-paste PTY write for Pi / Copilot / Crush / Hermes. |
-| 12 | **DeepSeek Anthropic gateway proxy** | In-process HTTP server translating OpenAI Responses API → Anthropic Messages API: streaming, extended thinking, tool use, multi-turn — no harness patching required. |
-| 13 | **Keep Awake** | One-click toggle to block system sleep during long agent jobs, without affecting screen dimming. |
-| 14 | **In-app update checker** | Green dot badge and download link when a new version is available — checked 10 s after launch then every 30 min. |
-| 15 | **Cross-platform** | macOS (arm64 + x64), Windows, Linux. PATH augmentation for nvm-windows, Volta, fnm. Correct PTY dimensions on all platforms. |
+| 1 | **Computer Use** | One-click enable for any agent tab. Injects `tday-nativecore` (Rust) as an MCP server with 20+ tools: AX tree traversal (`take_ax_snapshot`, `ax_click`, `ax_set_value`, `ax_perform_action`), OCR (`find_text`, `ocr_screenshot`), mouse/keyboard (`click`, `double_click`, `right_click`, `type_text`, `shortcut`, `scroll`, `drag`), screenshot (`take_screenshot`), Chrome DevTools Protocol (`probe_app`, `cdp_connect`, `cdp_find_elements`, `cdp_click`, `cdp_fill`), Android ADB, and `open_app`. Decision-tree skill guides agents: AX first → visual fallback → CDP last resort. **Computer Operator** built-in CoWorker preset. Permissions panel (Accessibility + Screen Recording) with one-click Grant. macOS arm64 + x64. |
+| 2 | **Multi-tab workspace** | Open any agent in browser-style tabs, drag to reorder, multi-row wrap, per-tab working directory with cwd commit and last-cwd persistence. |
+| 3 | **10 AI agent adapters** | Pi, Claude Code, Codex CLI, GitHub Copilot CLI, OpenCode, Gemini CLI, Qwen-Code, Crush, Hermes, DeepSeekTUI — each with auto-detect, one-click install, and per-agent accent color. |
+| 4 | **CoWorker system** | Reusable role personas injected as system prompts — selected per tab from the CwdBar. 35 built-in presets across 7 categories sourced from [`CoWorkers.md`](./CoWorkers.md), or your own custom/online CoWorkers. Community contributions welcome. |
+| 5 | **Cron job scheduler** | Schedule automated agent tasks with Interval / At Time / Custom cron modes. Human-readable preview, enable/disable, clone, delete, and a live dashboard with next-run countdown and last-status. |
+| 6 | **28-provider settings panel** | CRUD UI for DeepSeek, OpenAI, Anthropic, Gemini, xAI, Groq, Mistral, Ollama, LM Studio, OpenRouter, and 18 more — supports both OpenAI-compatible and Anthropic-compatible base URLs. |
+| 7 | **Per-agent provider & model binding** | Each agent tab runs on a different provider and model. Model flags are projected to CLI arguments at spawn time. Shared-config "all agents one provider" toggle also available. |
+| 8 | **Local inference auto-discovery** | TCP + HTTP fingerprint scan for Ollama, LM Studio, vLLM, llama.cpp, SGLang, LocalAI, Jan. Discovered models appear as chips in the provider UI. Manual base-URL probe available. |
+| 9 | **Cross-agent usage analytics** | Complete token and cost tracking for every agent and every session. Daily bar chart, by-model and by-agent breakdown tables, 30+ model pricing — all stored locally in SQLite. |
+| 10 | **Unified agent history** | Every session across all agents is automatically indexed. Browse, search, and restore any past conversation — including working directory and session ID — with one click. |
+| 11 | **Agent-native session resume** | Claude Code (`--resume`), Codex (`resume <id>`), OpenCode (`--session`), DeepSeekTUI (`resume <id>`) — session IDs are captured automatically and offered on tab restore. |
+| 12 | **Reliable prompt delivery** | Task prompts reach the agent at spawn time even when the screen is locked: CLI arg for Codex / Claude Code / Gemini / Qwen-Code / DeepSeekTUI; bracketed-paste PTY write for Pi / Copilot / Crush / Hermes. |
+| 13 | **DeepSeek Anthropic gateway proxy** | In-process HTTP server translating OpenAI Responses API → Anthropic Messages API: streaming, extended thinking, tool use, multi-turn — no harness patching required. |
+| 14 | **Keep Awake** | One-click toggle to block system sleep during long agent jobs, without affecting screen dimming. |
+| 15 | **In-app update checker** | Green dot badge and download link when a new version is available — checked 10 s after launch then every 30 min. |
+| 16 | **Cross-platform** | macOS (arm64 + x64), Windows, Linux. PATH augmentation for nvm-windows, Volta, fnm. Correct PTY dimensions on all platforms. |
 
 ---
 
@@ -149,7 +150,8 @@ Today, every coding-agent harness ships with its own CLI, its own provider confi
 │  │    ├─ bridge/  (input · tools · response · stream conversion)    │
 │  │    ├─ anthropic/  (HTTP client + SSE parser)                     │
 │  │    └─ deepseek/   (thinking encoder · per-session state cache)   │
-│  └─ Spawns: tday-core (Rust)                                        │
+│  ├─ Spawns: tday-core (Rust)                                        │
+│  └─ Spawns: tday-nativecore (Rust MCP, Computer Use)               │
 │                          ▲                                          │
 │                          │ JSON-RPC over stdio / Unix socket        │
 │                          ▼                                          │
@@ -159,6 +161,15 @@ Today, every coding-agent harness ships with its own CLI, its own provider confi
 │  ├─ Memory store (SQLite + sqlite-vec for embeddings)               │
 │  ├─ Usage logger (per-agent, per-provider, per-tab)                 │
 │  └─ Config & secrets (keyring crate, OS keychain)                   │
+│                                                                     │
+│  tday-nativecore (Rust MCP stdio server, Computer Use)              │
+│  ├─ AX tree: take_ax_snapshot / ax_click / ax_set_value / …        │
+│  ├─ OCR: find_text (Vision + multi-display) / ocr_screenshot        │
+│  ├─ Mouse/keyboard: click / type_text / shortcut / scroll / drag    │
+│  ├─ Screenshot: take_screenshot (per display, CGDirectDisplayID)    │
+│  ├─ CDP: probe_app / cdp_connect / cdp_find_elements / cdp_click    │
+│  ├─ Android: adb_tap / adb_key / adb_screenshot                     │
+│  └─ Launcher: open_app                                              │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -170,6 +181,7 @@ Today, every coding-agent harness ships with its own CLI, its own provider confi
 | Window, tabs, UI | Electron + React | Mature, fast iteration, rich ecosystem. |
 | PTY spawning | Electron main (node-pty) | Battle-tested, full TTY semantics, integrates cleanly with xterm.js. |
 | Detection / tokenization / memory | Rust (`tday-core`) | CPU-bound, must not block UI. Static binary, easy to ship & cross-compile. |
+| Computer Use tools (AX, OCR, mouse, CDP) | Rust (`tday-nativecore`) | Native macOS APIs (Accessibility, Vision, CGEvent); zero overhead on the Node event loop. |
 | Provider secrets | OS keychain via Rust | Avoid plaintext in app data; cross-platform. |
 
 ### Gateway — OpenAI Responses API → Anthropic proxy
@@ -243,16 +255,14 @@ A **Tab** owns one **Session** = one PTY process bound to one agent adapter, one
 | ~~**v0.6.0**~~ ✅ | Token usage analytics | Dashboard UI: summary cards, daily bar chart, by-model and by-agent breakdown (SQLite store, 30+ model pricing). |
 | ~~**v0.6.x**~~ ✅ | CoWorker system | **Settings → CoWorkers** tab: create/edit/delete role personas injected as system prompts. Three source types: built-in (`builtin:*` from AGENT.md), online (`online:*` URL-cached from GitHub), custom (inline text / local file / URL). Three curated presets (Karpathy Code Guidelines, Devin-style Planner, Earnings Call Analyst). CoWorker dropdown in CwdBar — select per tab, prompt injected immediately into the running PTY. CoWorker binding in Cron jobs. Settings dialog tabs now top-tab style; backdrop `no-drag` fix so tabs are always clickable even when TabBar wraps to multiple rows. |
 | ~~**v0.7.x**~~ ✅ | CoWorker Registry + Data Freshness | CoWorker registry expanded to **35 built-in presets across 7 categories** (Mental Models, Startup & Business, Coding & Engineering, Writing & Content, Research & Analysis, Security & Privacy, Productivity). GitHub ★ stars on cards and detail view (24 h TTL cache). Unique ID derivation per entry (`deriveRegistrySlug`). Online refresh button with spinner + error state. **App-level state lifting**: agents / coworkers / providers owned by App root, passed as props to Settings — eliminates IPC stutter on every Settings open. `requestIdleCallback` background refresh after Settings closes (5 s timeout fallback). New-tab provider submenu now includes all preset models alongside discovered & user-added models. |
-| **v0.7.0** 🔄 | MCP Management | MCP server registry in Settings (add/edit/remove, stdio & SSE transports). Auto-discover running local MCP processes. Per-agent MCP binding. Bundled quick-add servers: filesystem, memory, fetch, git. |
-| **v0.7.1** | Channels Management | Named I/O channels in Settings: pipe agent stdout to files, webhooks, or other agents. Fan-out (broadcast one agent's output to multiple sinks). Fan-in (merge streams from multiple agents into one tab). Channel editor with live preview. |
-| **v0.7.2** | Custom Agents | `AgentAdapter` public package. Register third-party agents via manifest URL or local path. Agents tab shows community adapters with one-click install. Custom system-prompt per agent. |
-| **v0.8.0** | Browser & Computer Use | `browser-use` agent adapter (Python). Playwright MCP server quick-add. Anthropic computer-use mode toggle (bash / screenshot / text-editor tools). Screenshot side-panel in tab. |
-| **v0.9.0** | Web Search & Web Tools | Search provider settings (Brave, Tavily, Jina, Perplexity). One-click MCP server install for each. Per-agent search-enable toggle. Web page reader / URL fetcher as shared tool. |
-| **v0.10.0** | Skills & Custom Instructions | Per-agent, per-project skill files (`AGENTS.md`, `SKILL.md`, `.instructions.md`). Global skills library in Settings. Skill injection at spawn time. Skill marketplace (import from URL / GitHub). |
-| **v0.11.0** | Unified long-term memory | SQLite + `sqlite-vec` embedding store. Background embed worker (Rust). MCP server `tday-memory` (`recall` / `remember` / `forget`). Per-project + global scopes. Memory browser + prune UI. |
-| **v0.12.0** | Performance & polish | xterm WebGL renderer. Lazy-render inactive tabs. Session snapshot/restore. Memory budget warnings. Profiling page (CPU/RSS/handles). |
-| **v0.13.0** | Plugins & extensibility | Adapter SDK (`AgentAdapter` public package). Third-party adapters via manifest URL. Custom themes. Plugin marketplace. |
-| **v0.14.0** | Sync & teams | Optional E2EE sync of memory + usage across devices. Team dashboards. Shared provider pools. |
+| ~~**v0.8.x**~~ ✅ | Computer Use | **Settings → Computer Use** tab: one-click enable per agent. `tday-nativecore` Rust binary injected as MCP server (stdio). **20+ tools**: AX tree (`take_ax_snapshot`, `ax_click`, `ax_set_value`, `ax_perform_action`), OCR (`find_text` with multi-display CGDirectDisplayID, `ocr_screenshot`), mouse/keyboard (`click`, `double_click`, `right_click`, `type_text`, `shortcut`, `scroll`, `drag`), screenshot (`take_screenshot`), CDP (`probe_app`, `cdp_connect`, `cdp_find_elements`, `cdp_click`, `cdp_fill`), Android ADB (`adb_tap`, `adb_key`), app launcher (`open_app`). Decision-tree skill: AX first → visual fallback → CDP last resort. **Computer Operator** built-in CoWorker preset. Permissions panel (Accessibility + Screen Recording) with always-visible Grant buttons + manual path instructions. macOS arm64 + x64. |
+| **v0.9.x** 🔄 | Web Search & Web Tools | Search provider settings (Brave, Tavily, Jina, Perplexity). One-click MCP server install for each. Per-agent search-enable toggle. Web page reader / URL fetcher as shared tool. |
+| **v0.10.0** | MCP Management | MCP server registry in Settings (add/edit/remove, stdio & SSE transports). Auto-discover running local MCP processes. Per-agent MCP binding. Bundled quick-add servers: filesystem, memory, fetch, git. |
+| **v0.11.0** | Skills & Custom Instructions | Per-agent, per-project skill files (`AGENTS.md`, `SKILL.md`, `.instructions.md`). Global skills library in Settings. Skill injection at spawn time. Skill marketplace (import from URL / GitHub). |
+| **v0.12.0** | Channels Management | Named I/O channels in Settings: pipe agent stdout to files, webhooks, or other agents. Fan-out (broadcast one agent's output to multiple sinks). Fan-in (merge streams from multiple agents into one tab). |
+| **v0.13.0** | Custom Agents | `AgentAdapter` public package. Register third-party agents via manifest URL or local path. Agents tab shows community adapters with one-click install. Custom system-prompt per agent. |
+| **v0.14.0** | Unified long-term memory | SQLite + `sqlite-vec` embedding store. Background embed worker (Rust). MCP server `tday-memory` (`recall` / `remember` / `forget`). Per-project + global scopes. Memory browser + prune UI. |
+| **v0.15.0** | Performance & polish | xterm WebGL renderer. Lazy-render inactive tabs. Session snapshot/restore. Memory budget warnings. Profiling page (CPU/RSS/handles). |
 | **v1.0.0** | GA | Auto-update (Squirrel), signed & notarised builds for macOS/Windows/Linux, full docs site, telemetry opt-in. |
 
 ---
@@ -455,23 +465,27 @@ Make `AgentAdapter` a public package so the community can ship their own agent i
 - [ ] Custom system-prompt per agent (injected before every session)
 - [ ] Adapter sandbox: run with `--no-asar` + restricted IPC subset
 
-### v0.8.0 — Browser & Computer Use
-Bring browser-automation and computer-use capabilities into Tday as first-class citizens — configure them once, launch them like any other agent tab.
+### ~~v0.8.x — Computer Use~~ ✅
+- [x] **Settings → Computer Use** tab — enable/disable per agent; shows supported agents (Claude Code, Codex, Gemini, OpenCode, Pi)
+- [x] **`tday-nativecore`** Rust MCP stdio server injected into agent configs at spawn:
+  - [x] claude-code: per-session temp settings file (`mcpServers`)
+  - [x] gemini: `~/.gemini/settings.json` (ref-counted, safe concurrent sessions)
+  - [x] opencode: `opencode.json` `mcp.servers` (ref-counted)
+  - [x] codex: `~/.codex/config.json` `mcpServers` (ref-counted)
+  - [x] pi: `~/.pi/agent/config.json` `mcpServers` + skill file at `~/.pi/agent/skills/tday-computer-use/SKILL.md`
+- [x] **AX tools**: `take_ax_snapshot`, `ax_click`, `ax_set_value`, `ax_select`, `ax_perform_action`
+- [x] **OCR tools**: `find_text` (Apple Vision, multi-display via CGDirectDisplayID), `ocr_screenshot`
+- [x] **Mouse/keyboard**: `click`, `double_click`, `right_click`, `type_text`, `shortcut`, `scroll`, `drag`
+- [x] **Screenshot**: `take_screenshot` (per display, stable CGDirectDisplayID — fixes external monitor detection)
+- [x] **CDP tools**: `probe_app`, `cdp_connect`, `cdp_find_elements`, `cdp_click`, `cdp_fill`
+- [x] **Android ADB**: `adb_tap`, `adb_key`, `adb_screenshot`
+- [x] **Launcher**: `open_app`
+- [x] **`COMPUTER_USE_SKILL`** injected as system prompt: decision tree (AX → visual → CDP), tool descriptions, reliability rules — **no `take_screenshot` as default first step**
+- [x] **Computer Operator** built-in CoWorker preset (`builtin:computer-use-operator`)
+- [x] **Permissions panel** — Accessibility + Screen Recording with always-visible Grant buttons, manual path instructions ("System Settings → Privacy & Security → …"), `checkPermissions` IPC, `requestPermission` IPC
+- [x] Self-signed cert for CI signing (hardcoded in `release.yml`) — prevents macOS TCC re-prompting on every update
 
-- [ ] **`browser-use` adapter** (`packages/adapters/browser-use`)
-  - [ ] `detect()` — checks `uv`/`pip` + `browser-use` install
-  - [ ] `buildLaunch()` — spawns `python -m browser_use` with task and provider env
-  - [ ] Install/update via Settings → Agents (runs `pip install browser-use`)
-  - [ ] Browser profile picker (default / incognito / custom profile path)
-  - [ ] Headless vs headed toggle
-- [ ] **Playwright MCP quick-add** — one-click add `@playwright/mcp` to MCP registry
-- [ ] **Anthropic computer-use mode** toggle for Claude Code
-  - [ ] Enables `bash`, `computer`, `text_editor` built-in tools
-  - [ ] Settings toggle per agent-profile
-  - [ ] Safety warning banner in UI
-- [ ] **Screenshot side-panel** — display screenshots emitted by computer-use tools inline in the tab
-
-### v0.9.0 — Web Search & Web Tools
+### v0.9.x — Web Search & Web Tools 🔄
 Give every agent instant access to the live web — configure search providers in Settings and inject them as MCP tools per agent.
 
 - [ ] **Settings → Web Search** sub-panel

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog, systemPreferences, desktopCapturer } from 'electron';
 import { electronApp } from '@electron-toolkit/utils';
 import { spawn as spawnPty, type IPty } from 'node-pty';
 import { spawn as spawnChild } from 'node:child_process';
@@ -733,6 +733,48 @@ function registerIpc(): void {
     if (/^https:\/\//.test(safe)) void shell.openExternal(safe);
   });
 
+  // ── macOS permission management (Computer Use) ──────────────────────────────
+  // Check current status of Accessibility + Screen Recording permissions.
+  ipcMain.handle(IPC.permissionsCheck, () => {
+    if (process.platform !== 'darwin') return { accessibility: true, screenRecording: 'granted' };
+    return {
+      accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+      screenRecording: systemPreferences.getMediaAccessStatus('screen'),
+    };
+  });
+
+  // Request a specific permission.
+  // 'accessibility' → shows system AX dialog immediately.
+  // 'screen'        → triggers desktopCapturer (first-time prompt); if already
+  //                   denied, opens System Settings Privacy page instead.
+  ipcMain.handle(IPC.permissionsRequest, async (_e, kind: 'accessibility' | 'screen') => {
+    if (process.platform !== 'darwin') return true;
+    if (kind === 'accessibility') {
+      systemPreferences.isTrustedAccessibilityClient(true);
+      return systemPreferences.isTrustedAccessibilityClient(false);
+    }
+    if (kind === 'screen') {
+      const status = systemPreferences.getMediaAccessStatus('screen');
+      if (status === 'denied') {
+        void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+        return false;
+      }
+      // 'not-determined' or anything else → trigger capture to show system prompt
+      try { await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 1, height: 1 } }); } catch { /* expected to fail without permission */ }
+      return systemPreferences.getMediaAccessStatus('screen') === 'granted';
+    }
+    return false;
+  });
+
+  // Open the relevant System Settings privacy pane directly.
+  ipcMain.handle(IPC.permissionsOpenSettings, (_e, kind: 'accessibility' | 'screen') => {
+    if (process.platform !== 'darwin') return;
+    const url = kind === 'accessibility'
+      ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
+      : 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture';
+    void shell.openExternal(url);
+  });
+
   // CronJob management
   ipcMain.handle(IPC.cronJobsList, (): CronJob[] => loadCronJobs());
   ipcMain.handle(IPC.cronJobsSave, (_e, jobs: CronJob[]): void => {
@@ -861,6 +903,9 @@ app.on('before-quit', () => {
 app.on('window-all-closed', () => {
   setShuttingDown(true);
   cronScheduler.destroy();
+  localGatewayManager.close();
   killAllPtys();
   if (process.platform !== 'darwin') app.quit();
 });
+
+

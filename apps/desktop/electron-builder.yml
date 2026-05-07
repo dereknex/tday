@@ -37,13 +37,26 @@ mac:
         - x64
         - arm64
   artifactName: "Tday-${version}-mac-${arch}.${ext}"
+  # ── Signing ──────────────────────────────────────────────────────────────
+  # Set CSC_IDENTITY_AUTO_DISCOVERY=false (local dev) to skip signing.
+  # In CI, import a self-signed p12 cert (GitHub Secret: APPLE_CERT_P12_BASE64)
+  # so all builds are signed with the same certificate fingerprint.
+  # This makes macOS TCC track the app by cert fingerprint + Bundle ID instead
+  # of CDHASH, so Accessibility/Screen Recording permissions persist across updates.
+  #
+  # To generate the cert once:
+  #   openssl req -x509 -newkey rsa:4096 -keyout tday-sign.key -out tday-sign.crt \
+  #     -days 3650 -nodes -subj "/CN=Tday Code Signing/O=Tday"
+  #   openssl pkcs12 -export -out tday-sign.p12 -inkey tday-sign.key -in tday-sign.crt
+  #   base64 -i tday-sign.p12  # → store as GitHub Secret APPLE_CERT_P12_BASE64
   hardenedRuntime: false
   gatekeeperAssess: false
-  identity: null
-  # tday-devtools MCP binary (built by cargo before packaging)
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # tday-nativecore MCP binary (built by cargo before packaging)
   extraResources:
-    - from: ../../crates/tday-devtools/target/release/tday-devtools
-      to: tday-devtools
+    - from: ../../crates/tday-nativecore/target/release/tday-nativecore
+      to: tday-nativecore
 
 # ── Windows ────────────────────────────────────────────────────────────────────
 win:
@@ -55,10 +68,10 @@ win:
       arch:
         - x64
   artifactName: "Tday-${version}-win-${arch}.${ext}"
-  # tday-devtools MCP binary
+  # tday-nativecore MCP binary
   extraResources:
-    - from: ../../crates/tday-devtools/target/release/tday-devtools.exe
-      to: tday-devtools.exe
+    - from: ../../crates/tday-nativecore/target/release/tday-nativecore.exe
+      to: tday-nativecore.exe
 
 nsis:
   oneClick: false
@@ -72,10 +85,10 @@ nsis:
 # ── Linux ──────────────────────────────────────────────────────────────────────
 linux:
   category: Development
-  # tday-devtools MCP binary
+  # tday-nativecore MCP binary
   extraResources:
-    - from: ../../crates/tday-devtools/target/release/tday-devtools
-      to: tday-devtools
+    - from: ../../crates/tday-nativecore/target/release/tday-nativecore
+      to: tday-nativecore
   executableName: Tday
   target:
     - target: AppImage

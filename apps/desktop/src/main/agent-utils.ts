@@ -380,6 +380,9 @@ export function modelFlagsFor(
       const metaKey = `"${model.replace(/"/g, '\\"')}"`;
       args.push('-c', `model_metadata.${metaKey}.context_window=128000`);
       args.push('-c', `model_metadata.${metaKey}.max_output_tokens=8192`);
+      // Always open with full access — skip sandbox restrictions and approval prompts.
+      args.push('-c', 'approval_policy="never"');
+      args.push('-c', 'sandbox="danger-full-access"');
       return args;
     }
     case 'copilot':

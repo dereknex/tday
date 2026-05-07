@@ -34,9 +34,9 @@ function cleanupDir(dir: string): void {
 // ── buildMcpEntry ─────────────────────────────────────────────────────────────
 
 describe('buildMcpEntry', () => {
-  it('returns the tday-devtools binary path as command', () => {
+  it('returns the tday-nativecore binary path as command', () => {
     const entry = buildMcpEntry();
-    expect(entry.command).toMatch(/tday-devtools(\.exe)?$/);
+    expect(entry.command).toMatch(/tday-nativecore(\.exe)?$/);
     expect(entry.args).toEqual([]);
   });
 

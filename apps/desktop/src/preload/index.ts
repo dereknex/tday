@@ -142,6 +142,13 @@ const api = {
     ipcRenderer.invoke(IPC.coworkerRefreshCache, id) as Promise<void>,
   refreshCoworkerRegistry: () =>
     ipcRenderer.invoke(IPC.coworkerRefreshRegistry) as Promise<CoWorker[]>,
+  // ── macOS permission management (Computer Use) ─────────────────────────────
+  checkPermissions: () =>
+    ipcRenderer.invoke(IPC.permissionsCheck) as Promise<{ accessibility: boolean; screenRecording: string }>,
+  requestPermission: (kind: 'accessibility' | 'screen') =>
+    ipcRenderer.invoke(IPC.permissionsRequest, kind) as Promise<boolean>,
+  openPermissionSettings: (kind: 'accessibility' | 'screen') =>
+    ipcRenderer.invoke(IPC.permissionsOpenSettings, kind) as Promise<void>,
 };
 
 contextBridge.exposeInMainWorld('tday', api);

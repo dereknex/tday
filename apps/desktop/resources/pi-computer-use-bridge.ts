@@ -2,11 +2,11 @@
  * Tday Computer Use — pi extension bridge
  *
  * Loaded by pi via `--extension /path/to/this/file.ts` when Computer Use is
- * enabled. Spawns the bundled `tday-devtools` MCP server, negotiates the MCP
+ * enabled. Spawns the bundled `tday-nativecore` MCP server, negotiates the MCP
  * handshake, lists all available tools, and registers each one with pi.
  *
  * Environment variables (set by tday before spawning pi):
- *   TDAY_DEVTOOLS_BIN  — absolute path to the tday-devtools binary
+ *   TDAY_DEVTOOLS_BIN  — absolute path to the tday-nativecore binary
  */
 
 // `import type` is erased by jiti at load time — no runtime module required.
@@ -41,7 +41,7 @@ export default async function (pi: ExtensionAPI) {
   });
 
   proc.on("error", (err) => {
-    console.error("[tday-pi-bridge] failed to start tday-devtools:", err.message);
+    console.error("[tday-pi-bridge] failed to start tday-nativecore:", err.message);
   });
 
   // ── JSON-RPC over stdio ─────────────────────────────────────────────────────

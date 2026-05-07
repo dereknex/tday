@@ -362,6 +362,10 @@ export const IPC = {
   coworkerFetchUrl: 'coworker:fetch-url',   // preview: fetch raw content from a URL
   coworkerRefreshCache: 'coworker:refresh-cache', // refresh cached content for online/url coworker
   coworkerRefreshRegistry: 'coworker:refresh-registry', // force re-fetch CoWorkers.md registry
+  // macOS permission management (Computer Use)
+  permissionsCheck: 'permissions:check',
+  permissionsRequest: 'permissions:request',
+  permissionsOpenSettings: 'permissions:open-settings',
 } as const;
 
 // ─── Discovery types ──────────────────────────────────────────────────────────

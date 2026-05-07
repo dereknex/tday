@@ -33,7 +33,7 @@ for (const rel of targets) {
 console.log(`[release] typechecking...`);
 execSync('pnpm --filter @tday/desktop typecheck', { stdio: 'inherit', cwd: root });
 
-// Build tday-devtools Rust MCP binary (required by electron-builder.yml extraResources).
+// Build tday-nativecore Rust MCP binary (required by electron-builder.yml extraResources).
 // execSync doesn't inherit the shell PATH, so explicitly include ~/.cargo/bin.
 const cargoHome = process.env.CARGO_HOME ?? join(process.env.HOME ?? '~', '.cargo');
 const cargoEnv = {
@@ -42,24 +42,24 @@ const cargoEnv = {
 };
 
 // On macOS we produce a universal (fat) binary so both x64 and arm64 packages work correctly.
-const crateDir = join(root, 'crates/tday-devtools');
+const crateDir = join(root, 'crates/tday-nativecore');
 const isMac = process.platform === 'darwin';
 if (isMac) {
   console.log('[release] installing Rust targets...');
   execSync('rustup target add aarch64-apple-darwin x86_64-apple-darwin', { stdio: 'inherit', env: cargoEnv });
-  console.log('[release] building tday-devtools (aarch64-apple-darwin)...');
+  console.log('[release] building tday-nativecore (aarch64-apple-darwin)...');
   execSync('cargo build --release --target aarch64-apple-darwin', { stdio: 'inherit', cwd: crateDir, env: cargoEnv });
-  console.log('[release] building tday-devtools (x86_64-apple-darwin)...');
+  console.log('[release] building tday-nativecore (x86_64-apple-darwin)...');
   execSync('cargo build --release --target x86_64-apple-darwin', { stdio: 'inherit', cwd: crateDir, env: cargoEnv });
   console.log('[release] lipo: creating universal binary...');
   execSync(
-    'lipo -create -output target/release/tday-devtools' +
-    ' target/aarch64-apple-darwin/release/tday-devtools' +
-    ' target/x86_64-apple-darwin/release/tday-devtools',
+    'lipo -create -output target/release/tday-nativecore' +
+    ' target/aarch64-apple-darwin/release/tday-nativecore' +
+    ' target/x86_64-apple-darwin/release/tday-nativecore',
     { stdio: 'inherit', cwd: crateDir },
   );
 } else {
-  console.log('[release] building tday-devtools...');
+  console.log('[release] building tday-nativecore...');
   execSync('cargo build --release', { stdio: 'inherit', cwd: crateDir, env: cargoEnv });
 }
 

@@ -51,9 +51,8 @@ jobs:
     env:
       ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
       ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
-      # Match the local config (`identity: null` in electron-builder.yml):
-      # don't try to discover or use a Developer-ID signing identity.
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'true'
+      CSC_KEY_PASSWORD: tday-signing-2024
     steps:
       - uses: actions/checkout@v4
 
@@ -82,11 +81,35 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: crates/tday-devtools -> target
+          workspaces: crates/tday-nativecore -> target
 
-      - name: Build tday-devtools (Computer Use MCP binary)
+      - name: Import self-signed signing certificate (macOS)
+        if: matrix.platform == 'mac'
+        env:
+          APPLE_CERT_P12_BASE64: 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
+          APPLE_CERT_PASSWORD: tday-signing-2024
+        run: |
+          # Decode the p12 and import into a temporary keychain so electron-builder
+          # can find and use it for signing without exposing credentials.
+          KEYCHAIN_PATH="$RUNNER_TEMP/tday-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$APPLE_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          # Let electron-builder auto-discover the identity
+          echo "CSC_KEYCHAIN=$KEYCHAIN_PATH" >> $GITHUB_ENV
+          rm "$RUNNER_TEMP/certificate.p12"
+
+      - name: Build tday-nativecore (Computer Use MCP binary)
         run: cargo build --release
-        working-directory: crates/tday-devtools
+        working-directory: crates/tday-nativecore
 
       - name: Typecheck
         run: pnpm -r typecheck

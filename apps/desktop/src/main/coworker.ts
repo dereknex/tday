@@ -34,6 +34,7 @@ const CACHE_STALE_MS = 6 * 60 * 60 * 1000; // 6 hours
 // ── Preset file mapping ───────────────────────────────────────────────────────
 
 const BUILTIN_PRESET_FILES: Record<string, string> = {
+  'builtin:computer-use-operator': 'computer-use-operator-AGENT.md',
   'builtin:qa':        'test-engineer-AGENT.md',
   'builtin:security':  'security-auditor-AGENT.md',
   'builtin:reviewer':  'code-reviewer-AGENT.md',
@@ -229,6 +230,14 @@ function readEffectiveBuiltinContent(coworker: CoWorker): string {
 
 // ── Built-in personas (metadata only — content loaded from files at runtime) ──
 const BUILTIN_COWORKERS: CoWorker[] = [
+  {
+    id: 'builtin:computer-use-operator',
+    name: 'Computer Operator',
+    emoji: '🖥️',
+    description: 'Operates the desktop like a real human — AX, keyboard, mouse first; screenshot and CDP only as last resort',
+    isBuiltIn: true,
+    systemPrompt: '# Computer Use Operator\n\nYou operate the desktop like a skilled human. Always prefer AX → keyboard → mouse → find_text → screenshot → CDP, in that order.',
+  },
   {
     id: 'builtin:qa',
     name: 'Test Engineer',

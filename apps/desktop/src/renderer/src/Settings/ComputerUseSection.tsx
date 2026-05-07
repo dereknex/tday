@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 /** Keep in sync with computer-use.ts */
 const SETTING_KEY = 'tday:computerUseEnabled';
@@ -13,17 +13,74 @@ const NAV_ITEMS: { id: NavItem; label: string }[] = [
   { id: 'permissions',  label: 'Permissions' },
 ];
 
+type PermStatus = 'authorized' | 'denied' | 'not-determined' | 'restricted' | 'unknown';
+
+interface PermState {
+  accessibility: PermStatus;
+  screenRecording: PermStatus;
+}
+
+function statusColor(s: PermStatus) {
+  if (s === 'authorized') return 'text-emerald-400';
+  if (s === 'denied' || s === 'restricted') return 'text-red-400';
+  return 'text-amber-400';
+}
+
+function statusLabel(s: PermStatus) {
+  if (s === 'authorized') return 'Granted';
+  if (s === 'denied') return 'Denied';
+  if (s === 'restricted') return 'Restricted';
+  return 'Not granted';
+}
+
 export function ComputerUseSection() {
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeNav, setActiveNav] = useState<NavItem>('overview');
+  const isMac = window.tday.platform === 'darwin';
+
+  const [perms, setPerms] = useState<PermState>({
+    accessibility: 'unknown' as PermStatus,
+    screenRecording: 'unknown' as PermStatus,
+  });
+  const [requesting, setRequesting] = useState<'accessibility' | 'screen' | null>(null);
+
+  const refreshPerms = useCallback(() => {
+    if (!isMac) return;
+    void window.tday.checkPermissions().then((p) => {
+      setPerms({
+        accessibility: p.accessibility ? 'authorized' : 'denied',
+        // Electron returns 'granted' for screen; normalise to 'authorized' for uniform display
+        screenRecording: (p.screenRecording === 'granted' ? 'authorized' : p.screenRecording) as PermStatus,
+      });
+    });
+  }, [isMac]);
 
   useEffect(() => {
     void window.tday.getAllSettings().then((s) => {
       setEnabled(Boolean(s[SETTING_KEY]));
       setLoading(false);
     });
-  }, []);
+    refreshPerms();
+  }, [refreshPerms]);
+
+  // Re-check permissions when user switches back to this tab (they may have granted in Settings)
+  useEffect(() => {
+    if (activeNav !== 'permissions') return;
+    refreshPerms();
+    const id = setInterval(refreshPerms, 2000);
+    return () => clearInterval(id);
+  }, [activeNav, refreshPerms]);
+
+  async function handleRequest(kind: 'accessibility' | 'screen') {
+    setRequesting(kind);
+    try {
+      await window.tday.requestPermission(kind);
+    } finally {
+      setRequesting(null);
+      refreshPerms();
+    }
+  }
 
   function handleToggle(next: boolean) {
     setEnabled(next);
@@ -109,7 +166,7 @@ export function ComputerUseSection() {
               <h2 className="text-sm font-semibold text-zinc-100">Overview</h2>
               <p className="mt-1 leading-relaxed text-zinc-400">
                 Computer Use grants agents the ability to see your screen and control your mouse &amp;
-                keyboard via <span className="font-mono text-zinc-300">tday-devtools</span> (injected
+                keyboard via <span className="font-mono text-zinc-300">tday-nativecore</span> (injected
                 as an MCP server at spawn time, removed on exit).
               </p>
               <p className="mt-2 leading-relaxed text-zinc-400">
@@ -142,7 +199,7 @@ export function ComputerUseSection() {
             <div className="border-b border-zinc-800/40 pb-3">
               <h2 className="text-sm font-semibold text-zinc-100">Capabilities</h2>
               <p className="mt-1 text-zinc-400">
-                Tools provided by <span className="font-mono text-zinc-300">tday-devtools</span> when
+                Tools provided by <span className="font-mono text-zinc-300">tday-nativecore</span> when
                 Computer Use is enabled. Run <span className="font-mono text-zinc-300">probe_app</span> first
                 to choose the right interaction approach.
               </p>
@@ -257,38 +314,67 @@ export function ComputerUseSection() {
           <div className="space-y-4">
             <div className="border-b border-zinc-800/40 pb-3">
               <h2 className="text-sm font-semibold text-zinc-100">Permissions</h2>
-              <p className="mt-1 text-zinc-400">
-                The operating system requires explicit permission grants before agents can use
-                screen and accessibility tools.
-              </p>
             </div>
 
             {/* macOS */}
-            <div>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">macOS</p>
-              <div className="space-y-2">
-                <div className="rounded-md border border-amber-700/40 bg-amber-900/15 px-4 py-3 space-y-2">
-                  <p className="text-[11px] font-semibold text-amber-300">Screen Recording</p>
-                  <p className="text-zinc-400 leading-relaxed">
-                    Go to{' '}
-                    <span className="font-medium text-amber-300">
-                      System Settings › Privacy &amp; Security › Screen Recording
-                    </span>{' '}
-                    and add your terminal or Tday to the allowed applications.
-                  </p>
-                </div>
-                <div className="rounded-md border border-amber-700/40 bg-amber-900/15 px-4 py-3 space-y-2">
-                  <p className="text-[11px] font-semibold text-amber-300">Accessibility</p>
-                  <p className="text-zinc-400 leading-relaxed">
-                    Go to{' '}
-                    <span className="font-medium text-amber-300">
-                      System Settings › Privacy &amp; Security › Accessibility
-                    </span>{' '}
-                    and add your terminal or Tday to the allowed applications.
+            {isMac && (
+              <div>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">macOS</p>
+                <div className="space-y-2">
+                  {/* Screen Recording */}
+                  <div className="rounded-md border border-zinc-700/50 bg-zinc-900/50 px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-zinc-200">Screen Recording</p>
+                        <p className="mt-0.5 text-[10px] text-zinc-500">Unlocks <span className="font-mono">take_screenshot</span> — captures screen content</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className={`text-[10px] font-medium ${statusColor(perms.screenRecording)}`}>
+                          {statusLabel(perms.screenRecording)}
+                        </span>
+                        <button
+                          onClick={() => void handleRequest('screen')}
+                          disabled={requesting === 'screen'}
+                          className="rounded bg-zinc-700 px-2.5 py-1 text-[10px] font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-50"
+                        >
+                          {requesting === 'screen' ? 'Requesting…' : perms.screenRecording === 'denied' ? 'Open Settings' : 'Grant'}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-zinc-600 leading-relaxed">
+                      Manual path: <span className="text-zinc-400">System Settings → Privacy &amp; Security → Screen Recording → enable Tday</span>
+                    </p>
+                  </div>
+                  {/* Accessibility */}
+                  <div className="rounded-md border border-zinc-700/50 bg-zinc-900/50 px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-zinc-200">Accessibility</p>
+                        <p className="mt-0.5 text-[10px] text-zinc-500">Unlocks AX tools — read and control native UI elements without screen capture</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className={`text-[10px] font-medium ${statusColor(perms.accessibility)}`}>
+                          {statusLabel(perms.accessibility)}
+                        </span>
+                        <button
+                          onClick={() => void handleRequest('accessibility')}
+                          disabled={requesting === 'accessibility'}
+                          className="rounded bg-zinc-700 px-2.5 py-1 text-[10px] font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-50"
+                        >
+                          {requesting === 'accessibility' ? 'Requesting…' : 'Grant'}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-zinc-600 leading-relaxed">
+                      Manual path: <span className="text-zinc-400">System Settings → Privacy &amp; Security → Accessibility → enable Tday</span>
+                    </p>
+                  </div>
+                  <p className="text-[10px] text-zinc-600 pt-1">
+                    Permission status refreshes every 2 s while this panel is open. Buttons can be clicked again at any time to re-trigger the system prompt.
                   </p>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Windows */}
             <div>
@@ -298,7 +384,7 @@ export function ComputerUseSection() {
                 <p className="text-zinc-400 leading-relaxed">
                   No extra permissions needed for most operations. If screen capture is blocked,
                   ensure the app is not sandboxed and Windows Defender / antivirus is not
-                  intercepting <span className="font-mono text-zinc-300">tday-devtools</span>.
+                  intercepting <span className="font-mono text-zinc-300">tday-nativecore</span>.
                 </p>
                 <p className="text-zinc-400 leading-relaxed">
                   For Android device control, install{' '}
