@@ -69,6 +69,23 @@ export function Terminal({ tabId, agentId, cwd, active, agentSessionId, onAgentS
     term.loadAddon(serialize);
     term.loadAddon(new WebLinksAddon());
     term.open(containerRef.current);
+
+    // Ctrl+Shift+C → copy selection to clipboard.
+    // xterm.js copies via the browser's native `copy` DOM event, which only fires
+    // for the OS system copy shortcut (Ctrl+C on Windows, Cmd+C on Mac).
+    // Ctrl+Shift+C is NOT a system copy shortcut so the browser never fires `copy`
+    // and xterm.js's copyHandler never runs. We intercept it manually here.
+    // Ctrl+Shift+V (paste) already works via xterm.js's internal textarea paste handler.
+    // Mac Cmd+C continues to work as before — this only adds Ctrl+Shift+C as an option.
+    term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.type === 'keydown' && e.code === 'KeyC') {
+        const sel = term.getSelection();
+        if (sel) void navigator.clipboard.writeText(sel);
+        return false; // prevent xterm forwarding to PTY
+      }
+      return true;
+    });
+
     fit.fit();
     term.focus();
     termRef.current = term;
