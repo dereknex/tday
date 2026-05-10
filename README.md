@@ -815,3 +815,5 @@ The [`CoWorkers.md`](./CoWorkers.md) file in this repository is the community-cu
 ## 13. License
 
 MIT License
+
+`tday-nativecore` (the Computer Use Rust binary) is licensed under the **Business Source License 1.1** — see [`crates/tday-nativecore/LICENSE`](crates/tday-nativecore/LICENSE).
