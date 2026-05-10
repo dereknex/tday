@@ -1,6 +1,6 @@
 # Tday — All-in-One Harness Agent Terminal
 
-> One terminal launcher for every coding-agent harness — Claude Code, Codex, Copilot CLI, OpenCode, Pi, and more. Browser-style tabs, unified provider config, auto-detected local inference, long-term memory, cross-agent token analytics, and **cross-platform Computer Use** (macOS · Windows · Linux).
+> One terminal for every coding-agent harness — Claude Code, Codex, Copilot CLI, OpenCode, Pi, and more. Browser-style tabs, unified provider config, auto-detected local inference, long-term memory, cross-agent token analytics, and **cross-platform Computer Use** (macOS · Windows · Linux).
 
 [![latest](https://img.shields.io/badge/release-latest-blue)](https://github.com/unbug/tday/releases)
 
