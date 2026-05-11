@@ -1,0 +1,78 @@
+{
+  "completed_steps": [
+    1
+  ],
+  "active_step": null,
+  "last_review": {
+    "decision": "pass",
+    "evidence": "Targeted desktop tests passed, desktop typecheck passed, and manual Settings verification confirmed a saved custom Gemini executable path still appears after app relaunch and Settings reopen.",
+    "artifacts": "apps/desktop/src/main/__tests__/agent-utils.test.ts,apps/desktop/src/renderer/src/Settings/AgentsSection.tsx,packages/shared/src/index.ts,~/.tday/agents.json",
+    "notes": "Known unrelated failure remains in src/main/__tests__/computer-use.test.ts for injectOpencodeMcpUrl when running the broader desktop test command; it is outside this step's changed surface.",
+    "step_number": 1,
+    "step_id": "U1"
+  },
+  "validated_plan_snapshot": {
+    "plan_path": "docs/plans/custom-agent-path.md",
+    "plan_signature": "a73b0c638f4dee908dd79c623da817dee7604c8474f3d5ddadecee1291a310bf",
+    "steps": [
+      {
+        "number": 1,
+        "step_id": "U1",
+        "result": "A configured custom executable path works end to end inside Tday.",
+        "verification": "`pnpm --filter @tday/desktop test -- src/main/__tests__/agent-utils.test.ts src/main/__tests__/path-utils.test.ts` plus a manual Settings check that saves a mise-managed Gemini path, reopens the dialog, and launches Gemini from that saved path.",
+        "depends_on": []
+      }
+    ]
+  },
+  "history": [
+    {
+      "at": "2026-05-11T12:18:34Z",
+      "action": "sync_plan_from_imm_plan",
+      "details": {
+        "plan_path": "docs/plans/custom-agent-path.md",
+        "plan_signature": "a73b0c638f4dee908dd79c623da817dee7604c8474f3d5ddadecee1291a310bf",
+        "plan_summary": "Add end-to-end custom agent path support so non-PATH installs like mise-managed Gemini can be detected, saved, and launched from Tday.",
+        "same_plan": false
+      }
+    },
+    {
+      "at": "2026-05-11T12:19:54Z",
+      "action": "activate_step",
+      "details": {
+        "plan_path": "docs/plans/custom-agent-path.md",
+        "step_number": 1,
+        "step_id": "U1"
+      }
+    },
+    {
+      "at": "2026-05-11T12:31:29Z",
+      "action": "record_execution_evidence",
+      "details": {
+        "step_number": 1,
+        "step_id": "U1",
+        "changed_files": [
+          "apps/desktop/src/main/__tests__/agent-utils.test.ts",
+          "apps/desktop/src/main/agent-utils.ts",
+          "apps/desktop/src/main/index.ts",
+          "apps/desktop/src/renderer/src/Settings/AgentsSection.tsx",
+          "packages/adapters/pi/src/index.ts",
+          "packages/shared/src/index.ts"
+        ]
+      }
+    },
+    {
+      "at": "2026-05-11T12:31:49Z",
+      "action": "review_step",
+      "details": {
+        "step_number": 1,
+        "step_id": "U1",
+        "decision": "pass"
+      }
+    }
+  ],
+  "requires_replan": false,
+  "plan_path": "docs/plans/custom-agent-path.md",
+  "plan_summary": "Add end-to-end custom agent path support so non-PATH installs like mise-managed Gemini can be detected, saved, and launched from Tday.",
+  "plan_signature": "a73b0c638f4dee908dd79c623da817dee7604c8474f3d5ddadecee1291a310bf",
+  "plan_last_validated_at": "2026-05-11T12:18:34Z"
+}
