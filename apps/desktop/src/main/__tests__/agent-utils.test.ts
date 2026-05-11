@@ -6,6 +6,8 @@ import {
   modelFlagsFor,
   normalizeLaunchCwd,
   INSTALL_SPECS,
+  detectGeneric,
+  resolveExecutable,
 } from '../agent-utils.js';
 
 describe('semverAtLeast', () => {
@@ -128,6 +130,27 @@ describe('normalizeLaunchCwd', () => {
   it('returns cwd when it exists', () => {
     const tmpDir = process.cwd(); // always exists
     expect(normalizeLaunchCwd(tmpDir)).toBe(tmpDir);
+  });
+});
+
+describe('detectGeneric', () => {
+  it('detects an absolute executable path', () => {
+    const result = detectGeneric(process.execPath);
+    expect(result.available).toBe(true);
+  });
+
+  it('returns unavailable for a missing absolute path', () => {
+    const missingPath = `${process.cwd()}/definitely-missing-tday-agent-binary`;
+    const result = detectGeneric(missingPath);
+    expect(result.available).toBe(false);
+  });
+});
+
+describe('resolveExecutable', () => {
+  it('keeps an absolute executable path for launch', () => {
+    const resolved = resolveExecutable(process.execPath, process.env);
+    expect(resolved.requested).toBe(process.execPath);
+    expect(resolved.resolved).toBe(process.execPath);
   });
 });
 

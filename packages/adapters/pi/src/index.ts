@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, isAbsolute } from 'node:path';
 import type { ProviderProfile } from '@tday/shared';
 
 export interface PiLaunchContext {
@@ -34,9 +34,15 @@ export const PiAdapter = {
 
   detect(bin = 'pi'): { available: boolean; version?: string; path?: string } {
     try {
-      // `where` on Windows, `which` on POSIX
-      const whichCmd = process.platform === 'win32' ? 'where' : 'which';
-      const path = execFileSync(whichCmd, [bin], { encoding: 'utf8' }).split(/\r?\n/)[0].trim();
+      const path = isAbsolute(bin)
+        ? (existsSync(bin) ? bin : '')
+        : execFileSync(
+          // `where` on Windows, `which` on POSIX
+          process.platform === 'win32' ? 'where' : 'which',
+          [bin],
+          { encoding: 'utf8' },
+        ).split(/\r?\n/)[0].trim();
+      if (!path) return { available: false };
       let version: string | undefined;
       try {
         version = execFileSync(path, ['--version'], {

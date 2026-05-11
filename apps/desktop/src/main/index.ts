@@ -170,14 +170,20 @@ function registerIpc(): void {
     const out: AgentInfo[] = [];
     for (const [id, spec] of Object.entries(INSTALL_SPECS) as Array<[AgentId, AgentInstallSpec | undefined]>) {
       const settings = agents.agents?.[id] ?? {};
-      const bin = settings.bin ?? spec?.bin ?? id;
-      const detect = id === 'pi' ? PiAdapter.detect(bin) : detectGeneric(bin);
+      const defaultBin = spec?.bin ?? id;
+      const configuredBin = settings.bin;
+      const usesCustomBin = Boolean(configuredBin && configuredBin !== defaultBin);
+      const detectBin = configuredBin ?? defaultBin;
+      const detect = id === 'pi' ? PiAdapter.detect(detectBin) : detectGeneric(detectBin);
       out.push({
         id,
         displayName: spec?.displayName ?? id,
         description: spec?.description,
         npmPackage: spec?.npmPackage,
         detect,
+        bin: usesCustomBin ? configuredBin : undefined,
+        args: settings.args,
+        usesCustomBin,
         providerId: settings.providerId,
         model: settings.model,
         isDefault: id === defaultId,
@@ -1007,5 +1013,3 @@ app.on('window-all-closed', () => {
   killAllPtys();
   if (process.platform !== 'darwin') app.quit();
 });
-
-

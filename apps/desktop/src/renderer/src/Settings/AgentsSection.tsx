@@ -13,7 +13,12 @@ function buildAgentsCfg(agentList: AgentInfo[]): AgentsConfig {
     agents: Object.fromEntries(
       agentList.map((a) => [
         a.id,
-        { providerId: a.providerId || undefined, model: a.model || undefined },
+        {
+          bin: a.bin?.trim() || undefined,
+          args: a.args?.length ? a.args : undefined,
+          providerId: a.providerId || undefined,
+          model: a.model || undefined,
+        },
       ]),
     ) as AgentsConfig['agents'],
   };
@@ -44,8 +49,11 @@ export function AgentsSection({
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [installPct, setInstallPct] = useState(0);
 
-  const persistAgents = (next: AgentInfo[]) => {
-    void window.tday.saveAgents(buildAgentsCfg(next));
+  const persistAgents = async (next: AgentInfo[], refresh = false) => {
+    await window.tday.saveAgents(buildAgentsCfg(next));
+    if (!refresh) return;
+    const refreshed = await window.tday.listAgents() as AgentInfo[];
+    onAgentsChange(refreshed);
   };
 
   const bindProvider = (agentId: string, providerId: string) => {
@@ -53,7 +61,7 @@ export function AgentsSection({
       ? agents.map((a) => ({ ...a, providerId: providerId || undefined }))
       : agents.map((a) => (a.id === agentId ? { ...a, providerId: providerId || undefined } : a));
     onAgentsChange(next);
-    persistAgents(next);
+    void persistAgents(next);
   };
 
   const setAgentModel = (agentId: string, model: string) => {
@@ -63,12 +71,45 @@ export function AgentsSection({
     onAgentsChange(next);
   };
 
-  const flushAgentModel = () => persistAgents(agents);
+  const flushAgentModel = () => { void persistAgents(agents); };
+
+  const setAgentBin = (agentId: string, bin: string) => {
+    const normalized = bin.replace(/^\s+/, '');
+    const next = agents.map((a) => (a.id === agentId
+      ? { ...a, bin: normalized || undefined, usesCustomBin: Boolean(normalized) }
+      : a));
+    onAgentsChange(next);
+  };
+
+  const flushAgentBin = async () => {
+    await persistAgents(agents, true);
+  };
+
+  const browseAgentBin = async (agent: AgentInfo) => {
+    const picked = await window.tday.pickFile({
+      filters: [{ name: 'All Files', extensions: ['*'] }],
+      defaultPath: agent.bin || home,
+    });
+    if (!picked) return;
+    const next = agents.map((a) => (a.id === agent.id
+      ? { ...a, bin: picked, usesCustomBin: true }
+      : a));
+    onAgentsChange(next);
+    await persistAgents(next, true);
+  };
+
+  const clearAgentBin = async (agentId: string) => {
+    const next = agents.map((a) => (a.id === agentId
+      ? { ...a, bin: undefined, usesCustomBin: false }
+      : a));
+    onAgentsChange(next);
+    await persistAgents(next, true);
+  };
 
   const setAsDefault = (agentId: AgentId) => {
     const next = agents.map((a) => ({ ...a, isDefault: a.id === agentId }));
     onAgentsChange(next);
-    persistAgents(next);
+    void persistAgents(next);
   };
 
   const toggleShared = (next: boolean) => {
@@ -83,7 +124,7 @@ export function AgentsSection({
           model: first.model,
         }));
         onAgentsChange(synced);
-        persistAgents(synced);
+        void persistAgents(synced);
       }
     }
   };
@@ -168,6 +209,7 @@ export function AgentsSection({
           const boundPreset = bound ? presetForKind(bound.kind) : null;
           const modelOptions = boundPreset?.models ?? [];
           const isInstalling = installingId === a.id;
+          const isCustomManaged = !!a.usesCustomBin;
           const agentCrons = cronJobs.filter((j) => j.agentId === a.id);
           return (
             <div className="space-y-4">
@@ -185,9 +227,14 @@ export function AgentsSection({
                       </span>
                     ) : (
                       <span className="rounded bg-zinc-700/60 px-1.5 text-[10px] text-zinc-300">
-                        {a.npmPackage ? 'not installed' : 'not on PATH'}
+                        {isCustomManaged ? 'custom path missing' : a.npmPackage ? 'not installed' : 'not on PATH'}
                       </span>
                     )}
+                    {isCustomManaged ? (
+                      <span className="rounded bg-sky-500/20 px-1.5 text-[10px] text-sky-300">
+                        external path
+                      </span>
+                    ) : null}
                     {a.isDefault ? (
                       <span className="rounded bg-fuchsia-500/20 px-1.5 text-[10px] text-fuchsia-300">
                         default
@@ -199,16 +246,15 @@ export function AgentsSection({
                   ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  {!a.detect.available && a.npmPackage ? (
+                  {isCustomManaged ? (
                     <button
-                      onClick={() => void installAgent(a.id, 'install')}
-                      disabled={isInstalling}
-                      className="rounded-md bg-fuchsia-500/90 px-3 py-1 text-xs font-medium text-white hover:bg-fuchsia-500 disabled:opacity-60"
+                      onClick={() => void clearAgentBin(a.id)}
+                      className="rounded-md border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                      title="Clear custom executable path"
                     >
-                      {isInstalling ? `${installPct}%` : 'Install'}
+                      Clear path
                     </button>
-                  ) : null}
-                  {a.detect.available && a.npmPackage ? (
+                  ) : a.detect.available && a.npmPackage ? (
                     <>
                       <button
                         onClick={() => void installAgent(a.id, 'update')}
@@ -227,6 +273,14 @@ export function AgentsSection({
                         Uninstall
                       </button>
                     </>
+                  ) : !a.detect.available && a.npmPackage ? (
+                    <button
+                      onClick={() => void installAgent(a.id, 'install')}
+                      disabled={isInstalling}
+                      className="rounded-md bg-fuchsia-500/90 px-3 py-1 text-xs font-medium text-white hover:bg-fuchsia-500 disabled:opacity-60"
+                    >
+                      {isInstalling ? `${installPct}%` : 'Install'}
+                    </button>
                   ) : null}
                 </div>
               </div>
@@ -286,6 +340,37 @@ export function AgentsSection({
                     </datalist>
                   ) : null}
                 </label>
+              </div>
+
+              <div className="space-y-2 border-b border-zinc-800/40 pb-3">
+                <label className="block">
+                  <span className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">
+                    Executable path
+                  </span>
+                  <div className="flex gap-2">
+                    <input
+                      className="input flex-1"
+                      placeholder={`use PATH fallback (${a.id === 'claude-code' ? 'claude' : a.id === 'qwen-code' ? 'qwen' : a.id === 'deepseek-tui' ? 'deepseek' : a.id})`}
+                      value={a.bin ?? ''}
+                      onChange={(e) => setAgentBin(a.id, e.target.value)}
+                      onBlur={() => { void flushAgentBin(); }}
+                    />
+                    <button
+                      onClick={() => void browseAgentBin(a)}
+                      className="rounded-md border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:bg-zinc-800"
+                    >
+                      Browse
+                    </button>
+                  </div>
+                </label>
+                <p className="text-[11px] text-zinc-500">
+                  Leave empty to use PATH detection and Tday&apos;s built-in install flow. Set an absolute path for externally managed installs such as `mise`.
+                </p>
+                {isCustomManaged ? (
+                  <p className="text-[11px] text-sky-300">
+                    This agent is treated as externally managed while a custom executable path is set.
+                  </p>
+                ) : null}
               </div>
 
               {/* Default for new tabs */}

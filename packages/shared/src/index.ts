@@ -173,6 +173,12 @@ export interface AgentInfo {
   description?: string;
   npmPackage?: string;
   detect: { available: boolean; version?: string; error?: string };
+  /** User-configured executable path from agents.json, if any. */
+  bin?: string;
+  /** Persisted extra args for this agent, carried through save round-trips. */
+  args?: string[];
+  /** True when `bin` overrides the built-in command name. */
+  usesCustomBin?: boolean;
   /** Bound provider id from agents.json. */
   providerId?: string;
   /** Bound model override. */

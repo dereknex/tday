@@ -141,13 +141,18 @@ const detectCache = new Map<string, { available: boolean; version?: string; erro
 
 function _detectGenericUncached(bin: string): { available: boolean; version?: string; error?: string } {
   try {
-    // Use absolute paths for system tools: when Electron starts from a shortcut
-    // on Windows, PATH may only contain .tday\bin — 'where' and 'which' won't
-    // be found unless we reference them absolutely.
-    const whichCmd = process.platform === 'win32'
-      ? join(process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows', 'System32', 'where.exe')
-      : 'which';
-    const raw = execFileSync(whichCmd, [bin], { encoding: 'utf8' }).split(/\r?\n/)[0].trim();
+    const raw = isAbsolute(bin)
+      ? (existsSync(bin) ? bin : '')
+      : execFileSync(
+        // Use absolute paths for system tools: when Electron starts from a shortcut
+        // on Windows, PATH may only contain .tday\bin — 'where' and 'which' won't
+        // be found unless we reference them absolutely.
+        process.platform === 'win32'
+          ? join(process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows', 'System32', 'where.exe')
+          : 'which',
+        [bin],
+        { encoding: 'utf8' },
+      ).split(/\r?\n/)[0].trim();
     if (!raw) return { available: false };
     let version: string | undefined;
     try {
